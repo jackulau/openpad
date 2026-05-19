@@ -26,7 +26,6 @@ import { registerRecordingsRoutes } from './routes/recordings.js';
 import { registerWhiteboardRoutes } from './routes/whiteboard.js';
 import { registerQuestionRoutes } from './routes/questions.js';
 import { registerInterviewRoutes } from './routes/interviews.js';
-import { registerAIReviewRoutes } from './routes/aiReview.js';
 import { registerSetupRoutes } from './routes/setup.js';
 import { reconcileOnBoot } from './services/recordings.js';
 import { registerWebSocket } from './ws/index.js';
@@ -166,7 +165,6 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerWhiteboardRoutes, { prefix: '/api/pads' });
   await server.register(registerQuestionRoutes, { prefix: '/api/questions' });
   await server.register(registerInterviewRoutes, { prefix: '/api/pads' });
-  await server.register(registerAIReviewRoutes, { prefix: '/api/pads' });
   await server.register(registerSetupRoutes, { prefix: '/api/setup' });
   await registerWebSocket(server);
 

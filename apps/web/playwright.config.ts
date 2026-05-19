@@ -35,7 +35,6 @@ export default defineConfig({
             JWT_SECRET:
               process.env.JWT_SECRET ?? 'e2e-secret-must-be-32-characters-long-enough',
             EXEC_FORCE_LOCAL: 'true',
-            AI_PROVIDER: 'none',
             NODE_ENV: 'development',
             PUBLIC_BASE_URL: 'http://localhost:5173',
           },

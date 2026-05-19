@@ -16,6 +16,8 @@ export interface PadSummary {
   language: string;
   kind: PadKind;
   ownerId: string;
+  hasPassword?: boolean;
+  autoRecord?: boolean;
   updatedAt: string;
   createdAt: string;
   myRole: Role;
@@ -54,13 +56,6 @@ export interface RunResult {
   durationMs: number;
   runner: 'docker' | 'subprocess' | 'disabled';
   language: string;
-}
-
-export interface AIReviewComment {
-  file: string;
-  line: number;
-  severity: 'info' | 'warn' | 'error';
-  comment: string;
 }
 
 export interface InterviewRubric {

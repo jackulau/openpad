@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { editor as MonacoEditorTypes } from 'monaco-editor';
 import { MonacoBinding } from 'y-monaco';
-import type { AIReviewComment, RunResult } from '@opencoder/shared';
+import type { RunResult } from '@opencoder/shared';
 import { groupedLanguages, resolveLanguage } from '@opencoder/shared';
 import { AppHeader } from '../components/AppHeader';
 import { Editor } from '../components/Editor';
@@ -11,11 +11,15 @@ import { OutputPanel } from '../components/OutputPanel';
 import { FileTree } from '../components/FileTree';
 import { Chat } from '../components/Chat';
 import { Terminal } from '../components/Terminal';
-import { AIReviewPanel } from '../components/AIReviewPanel';
 import { InvitesPanel } from '../components/InvitesPanel';
-import { PresenceSidebar } from '../components/PresenceSidebar';
+import { AvatarStack } from '../components/AvatarStack';
+import { RecordingsPanel } from '../components/RecordingsPanel';
+import { WhiteboardCanvas } from '../components/WhiteboardCanvas';
+import { MembersPanel } from '../components/MembersPanel';
+import { PadSidebar, type SidebarTool } from '../components/PadSidebar';
 import { ShortcutsModal, useShortcutsModal } from '../components/ShortcutsModal';
 import { padsApi } from '../lib/pads';
+import { filesApi } from '../lib/files';
 import { execApi } from '../lib/exec';
 import { useCollab } from '../lib/useCollab';
 import { useAuth } from '../lib/authStore';
@@ -25,8 +29,6 @@ import { HttpError } from '../lib/api';
 import { useToasts } from '../lib/toast';
 import { api } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
-
-type RightTab = 'output' | 'chat' | 'terminal' | 'review';
 
 export function Pad() {
   const { slug = '' } = useParams<{ slug: string }>();
@@ -40,14 +42,16 @@ export function Pad() {
 
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [language, setLanguage] = useState('python');
-  const [tab, setTab] = useState<RightTab>('output');
+  const [sidebarTool, setSidebarTool] = useState<SidebarTool | null>('files');
   const [result, setResult] = useState<RunResult | undefined>();
+  const [outputOpen, setOutputOpen] = useState(false);
   const [invitesOpen, setInvitesOpen] = useState(false);
-  const [aiComments, setAiComments] = useState<AIReviewComment[]>([]);
 
-  // editor + Yjs binding
+  // editor + Yjs binding. `editorTick` bumps whenever onMount fires so dependent
+  // effects (cursor presence, Yjs binding) can re-run after Monaco is ready.
   const editorRef = useRef<MonacoEditorTypes.IStandaloneCodeEditor | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
+  const [editorTick, setEditorTick] = useState(0);
 
   useEffect(() => {
     if (pad.data && !activeFileId) {
@@ -72,7 +76,7 @@ export function Pad() {
       binding.destroy();
       bindingRef.current = null;
     };
-  }, [client, activeFileId]);
+  }, [client, activeFileId, editorTick]);
 
   const myRole = pad.data?.pad.myRole ?? 'viewer';
   const editAllowed = canEditRole(myRole);
@@ -82,6 +86,71 @@ export function Pad() {
     if (!client || !user || !activeFileId) return;
     client.setSelfPresence({ fileId: activeFileId, userId: user.id, name: user.name });
   }, [client, user, activeFileId]);
+
+  // Stream cursor + selection from Monaco into presence so peers see a live
+  // caret + name label on the current file. Re-subscribed whenever the active
+  // file changes or the editor remounts.
+  useEffect(() => {
+    if (!client || !user || !activeFileId || !editorRef.current) return;
+    const editor = editorRef.current;
+    const pushCursor = () => {
+      const pos = editor.getPosition();
+      const sel = editor.getSelection();
+      if (!pos) return;
+      const payload: Parameters<typeof client.setSelfPresence>[0] = {
+        fileId: activeFileId,
+        userId: user.id,
+        name: user.name,
+        cursor: { line: pos.lineNumber, column: pos.column },
+      };
+      if (sel && !sel.isEmpty()) {
+        payload.selection = {
+          startLine: sel.startLineNumber,
+          startColumn: sel.startColumn,
+          endLine: sel.endLineNumber,
+          endColumn: sel.endColumn,
+        };
+      }
+      client.setSelfPresence(payload);
+    };
+    pushCursor();
+    const d1 = editor.onDidChangeCursorPosition(pushCursor);
+    const d2 = editor.onDidChangeCursorSelection(pushCursor);
+    return () => {
+      d1.dispose();
+      d2.dispose();
+    };
+  }, [client, user, activeFileId, editorTick]);
+
+  // Remote cursors for the current file (exclude self).
+  const remoteCursors = useMemo(() => {
+    if (!activeFileId || !user) return [];
+    const out: Array<{
+      userId: string;
+      name: string;
+      color: string;
+      cursor: { line: number; column: number };
+      selection?: {
+        startLine: number;
+        startColumn: number;
+        endLine: number;
+        endColumn: number;
+      };
+    }> = [];
+    for (const p of Object.values(presence)) {
+      if (p.userId === user.id) continue;
+      if (p.fileId !== activeFileId) continue;
+      if (!p.cursor) continue;
+      out.push({
+        userId: p.userId,
+        name: p.name,
+        color: p.color,
+        cursor: p.cursor,
+        selection: p.selection,
+      });
+    }
+    return out;
+  }, [presence, activeFileId, user]);
 
   const activeFile = useMemo(
     () => pad.data?.files.find((f) => f.id === activeFileId),
@@ -101,16 +170,33 @@ export function Pad() {
     },
     onSuccess: (r) => {
       setResult(r);
-      setTab('output');
+      setOutputOpen(true);
     },
   });
 
-  // Cmd/Ctrl+Enter: run
+  // Cmd/Ctrl+Enter: run. Alt+1..7: jump to sidebar tool (skipped when typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         if (editAllowed) run.mutate();
+        return;
+      }
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if (inField || e.metaKey || e.ctrlKey || e.altKey) return;
+      const sidebarShortcuts: Record<string, SidebarTool> = {
+        '1': 'files',
+        '2': 'members',
+        '3': 'chat',
+        '4': 'terminal',
+        '5': 'whiteboard',
+        '6': 'recordings',
+      };
+      const target = sidebarShortcuts[e.key];
+      if (target) {
+        e.preventDefault();
+        setSidebarTool((t) => (t === target ? null : target));
       }
     };
     window.addEventListener('keydown', onKey);
@@ -131,7 +217,26 @@ export function Pad() {
     onError: (e) => push(e instanceof HttpError ? e.error : 'Failed', 'error'),
   });
 
-  if (pad.isLoading) return <div className="p-8 text-zinc-400">loading…</div>;
+  // Switching the language picker also renames the active file to the new
+  // language's default name AND swaps content to the matching template if the
+  // user hasn't typed real code. Refetches the pad so the file tree updates.
+  async function changeFileLanguage(next: string) {
+    if (!activeFileId) return;
+    try {
+      const res = await filesApi.relanguage(slug, activeFileId, next);
+      await qc.invalidateQueries({ queryKey: ['pad', slug] });
+      push(
+        res.contentReplaced
+          ? `Switched to ${next} (template loaded)`
+          : `Switched to ${next}`,
+        'success',
+      );
+    } catch (e) {
+      push(e instanceof HttpError ? e.error : 'Language change failed', 'error');
+    }
+  }
+
+  if (pad.isLoading) return <div className="p-8 text-secondary">loading…</div>;
   if (pad.error) return <UnlockOrError slug={slug} onUnlocked={() => pad.refetch()} />;
   if (!pad.data) return null;
 
@@ -142,10 +247,11 @@ export function Pad() {
   return (
     <div className="h-screen flex flex-col">
       <AppHeader />
-      <div className="border-b border-zinc-800 px-4 py-2 flex items-center gap-3 text-sm">
+      <div className="border-b border-line px-4 py-2 flex items-center gap-3 text-sm">
         <h2 className="font-medium">{pad.data.pad.title}</h2>
-        <span className="text-xs text-zinc-500">{slug}</span>
+        <span className="text-xs text-subtle">{slug}</span>
         <ConnectionDot status={status} />
+        <AvatarStack me={user ? { id: user.id, name: user.name } : null} presence={presence} />
         <div className="ml-auto flex items-center gap-2">
           {isInterview && (
             <Link to={`/p/${slug}/interview`} className="btn-secondary !py-1">
@@ -170,14 +276,23 @@ export function Pad() {
           )}
           <LanguagePicker
             value={language}
-            onChange={setLanguage}
+            onChange={(next) => {
+              if (next === language) return;
+              setLanguage(next);
+              void changeFileLanguage(next);
+            }}
             disabled={!editAllowed}
           />
           {currentLang?.version && (
             <select
               className="input !py-1 !text-sm"
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                if (next === language) return;
+                setLanguage(next);
+                void changeFileLanguage(next);
+              }}
               disabled={!editAllowed}
               title="Version"
             >
@@ -191,85 +306,105 @@ export function Pad() {
             </select>
           )}
           <button
-            className="btn-primary !py-1"
+            className="btn-primary !py-1.5 !px-3 inline-flex items-center gap-2"
             onClick={() => run.mutate()}
             disabled={!editAllowed || run.isPending}
+            title="Run code (⌘↵ / Ctrl+Enter)"
           >
-            {run.isPending ? 'Running…' : 'Run ⌘↵'}
+            {run.isPending ? (
+              <>
+                <SpinnerIcon />
+                <span>Running</span>
+              </>
+            ) : (
+              <>
+                <PlayIcon />
+                <span>Run</span>
+                <kbd className="kbd !bg-accent-fg/15 !text-accent-fg !border-accent-fg/30">⌘↵</kbd>
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-[220px_1fr_420px] min-h-0">
-        <aside className="border-r border-zinc-800 p-2 overflow-y-auto">
-          <FileTree
-            slug={slug}
-            files={pad.data.files}
-            activeFileId={activeFileId}
-            onActivate={(f) => {
-              setActiveFileId(f.id);
-              setLanguage(f.language);
-            }}
-            canEdit={editAllowed}
-          />
-          <PresenceSidebar
-            me={user ? { id: user.id, name: user.name } : null}
-            presence={presence}
-            files={pad.data.files}
-          />
-          <div className="text-xs uppercase tracking-wide text-zinc-500 px-2 mt-4 mb-1">
-            Members
-          </div>
-          {pad.data.members.map((m) => (
-            <div key={m.id} className="px-2 py-1 text-xs text-zinc-400">
-              {m.name} <span className="text-zinc-600">· {m.role}</span>
-            </div>
-          ))}
-        </aside>
-        <main className="min-w-0 min-h-0">
-          <Editor
-            language={language}
-            value=""
-            onMount={(ed) => {
-              editorRef.current = ed;
-              // value will be driven by Yjs binding once active file is set
-            }}
-          />
-        </main>
-        <section className="border-l border-zinc-800 min-w-0 flex flex-col min-h-0">
-          <div className="flex border-b border-zinc-800">
-            {(
-              [
-                ['output', 'Output'],
-                ['chat', 'Chat'],
-                ['terminal', 'Terminal'],
-                ['review', 'AI'],
-              ] as const
-            ).map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => setTab(k)}
-                className={`flex-1 py-2 text-xs uppercase tracking-wide ${
-                  tab === k
-                    ? 'bg-zinc-900 text-zinc-100 border-b-2 border-brand-400'
-                    : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 min-h-0">
-            {tab === 'output' && <OutputPanel running={run.isPending} result={result} />}
-            {tab === 'chat' && (
+      <div className="flex-1 flex min-h-0">
+        <PadSidebar
+          active={sidebarTool}
+          onSelect={setSidebarTool}
+          badges={{
+            recordings: pad.data.pad.autoRecord ? (
+              <span className="block size-2 rounded-full bg-success animate-pulse" />
+            ) : undefined,
+          }}
+        />
+        {sidebarTool && (
+          <section
+            className={`border-r border-line bg-page flex flex-col min-h-0 ${
+              sidebarTool === 'whiteboard' ? 'flex-1' : ''
+            }`}
+            style={
+              sidebarTool === 'whiteboard'
+                ? undefined
+                : { width: sidebarTool === 'terminal' ? 480 : 320 }
+            }
+          >
+            {sidebarTool === 'files' && (
+              <div className="p-2 overflow-y-auto h-full">
+                <FileTree
+                  slug={slug}
+                  files={pad.data.files}
+                  activeFileId={activeFileId}
+                  onActivate={(f) => {
+                    setActiveFileId(f.id);
+                    setLanguage(f.language);
+                  }}
+                  canEdit={editAllowed}
+                />
+              </div>
+            )}
+            {sidebarTool === 'members' && (
+              <MembersPanel slug={slug} myUserId={user?.id ?? null} myRole={myRole} />
+            )}
+            {sidebarTool === 'chat' && (
               <Chat slug={slug} client={client} myUserId={user?.id ?? null} />
             )}
-            {tab === 'terminal' && <Terminal slug={slug} active={tab === 'terminal'} />}
-            {tab === 'review' && (
-              <AIReviewPanel slug={slug} comments={aiComments} setComments={setAiComments} />
+            {sidebarTool === 'terminal' && (
+              <Terminal slug={slug} active={sidebarTool === 'terminal'} />
             )}
-          </div>
-        </section>
+            {sidebarTool === 'whiteboard' && client && (
+              <WhiteboardCanvas client={client} active={sidebarTool === 'whiteboard'} />
+            )}
+            {sidebarTool === 'recordings' && (
+              <RecordingsPanel
+                slug={slug}
+                autoRecord={pad.data.pad.autoRecord ?? false}
+                canManage={myRole === 'owner'}
+              />
+            )}
+          </section>
+        )}
+        {sidebarTool !== 'whiteboard' && (
+          <main className="flex-1 flex flex-col min-w-0 min-h-0">
+            <div className="flex-1 min-h-0">
+              <Editor
+                language={language}
+                value=""
+                remoteCursors={remoteCursors}
+                onMount={(ed) => {
+                  editorRef.current = ed;
+                  setEditorTick((t) => t + 1);
+                  // value will be driven by Yjs binding once active file is set
+                }}
+              />
+            </div>
+            <OutputDrawer
+              open={outputOpen}
+              running={run.isPending}
+              result={result}
+              onToggle={() => setOutputOpen((o) => !o)}
+            />
+          </main>
+        )}
       </div>
 
       {invitesOpen && <InvitesPanel slug={slug} onClose={() => setInvitesOpen(false)} />}
@@ -337,13 +472,13 @@ function UnlockOrError({ slug, onUnlocked }: { slug: string; onUnlocked: () => v
     },
   });
   if (preview.isLoading)
-    return <div className="p-8 text-zinc-400">checking pad…</div>;
+    return <div className="p-8 text-secondary">checking pad…</div>;
   if (preview.error || !preview.data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="card p-6 max-w-md w-full space-y-2 text-center">
           <h2 className="text-lg font-semibold">Pad not found</h2>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-secondary">
             This pad doesn't exist or has been deleted.
           </p>
           <Link to="/dashboard" className="btn-secondary inline-flex mt-2">
@@ -358,7 +493,7 @@ function UnlockOrError({ slug, onUnlocked }: { slug: string; onUnlocked: () => v
       <div className="min-h-screen flex items-center justify-center">
         <div className="card p-6 max-w-md w-full space-y-2 text-center">
           <h2 className="text-lg font-semibold">Access denied</h2>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-secondary">
             You're not a member of this pad. Ask the owner for an invite.
           </p>
           <Link to="/dashboard" className="btn-secondary inline-flex mt-2">
@@ -379,10 +514,10 @@ function UnlockOrError({ slug, onUnlocked }: { slug: string; onUnlocked: () => v
       >
         <div className="space-y-1">
           <h2 className="text-lg font-semibold">{preview.data.title}</h2>
-          <p className="text-sm text-zinc-400">This pad is password protected.</p>
+          <p className="text-sm text-secondary">This pad is password protected.</p>
         </div>
         <label className="block">
-          <span className="text-xs uppercase tracking-wide text-zinc-500">Password</span>
+          <span className="text-xs uppercase tracking-wide text-subtle">Password</span>
           <input
             type="password"
             autoFocus
@@ -391,7 +526,7 @@ function UnlockOrError({ slug, onUnlocked }: { slug: string; onUnlocked: () => v
             onChange={(e) => setPassword(e.target.value)}
           />
         </label>
-        {err && <div className="text-sm text-red-400" role="alert">{err}</div>}
+        {err && <div className="text-sm text-danger" role="alert">{err}</div>}
         <button
           type="submit"
           className="btn-primary w-full"
@@ -408,16 +543,98 @@ function ConnectionDot({ status }: { status: string }) {
   const colors: Record<string, string> = {
     connecting: 'bg-amber-400',
     reconnecting: 'bg-amber-400',
-    connected: 'bg-emerald-400',
-    closed: 'bg-zinc-600',
+    connected: 'bg-success',
+    closed: 'bg-muted',
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs text-zinc-500`}
+      className={`inline-flex items-center gap-1.5 text-xs text-subtle`}
       title={`collab ${status}`}
     >
-      <span className={`size-1.5 rounded-full ${colors[status] ?? 'bg-zinc-600'}`} />
+      <span className={`size-1.5 rounded-full ${colors[status] ?? 'bg-muted'}`} />
       {status}
     </span>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+function SpinnerIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="animate-spin" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-6.21-8.56" />
+    </svg>
+  );
+}
+
+// Bottom drawer below the editor that holds the most-recent Run result. Auto-
+// opens on Run; user can collapse via the chevron. Collapsed state shows a
+// thin status bar (exit code + duration) so they can re-expand at a glance.
+function OutputDrawer({
+  open,
+  running,
+  result,
+  onToggle,
+}: {
+  open: boolean;
+  running: boolean;
+  result: RunResult | undefined;
+  onToggle: () => void;
+}) {
+  const height = open ? 220 : 32;
+  return (
+    <section
+      className="border-t border-line bg-page flex flex-col transition-[height]"
+      style={{ height }}
+    >
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 px-3 h-8 text-xs text-secondary hover:text-primary hover:bg-hover/40 transition-colors"
+        aria-expanded={open}
+        aria-label={open ? 'Collapse output' : 'Expand output'}
+      >
+        <Chevron open={open} />
+        <span className="font-medium uppercase tracking-wide">Output</span>
+        {running && (
+          <span className="ml-2 text-accent inline-flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-accent animate-pulse" /> running
+          </span>
+        )}
+        {!running && result && (
+          <span className="ml-2 text-subtle">
+            exit {String(result.exitCode)} · {result.durationMs}ms
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <OutputPanel running={running} result={result} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 150ms' }}
+      aria-hidden="true"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
   );
 }

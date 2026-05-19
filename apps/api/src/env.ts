@@ -15,11 +15,6 @@ const schema = z.object({
   EXEC_CPU: z.string().default('1'),
   EXEC_FORCE_LOCAL: z.coerce.boolean().default(false),
   TERMINAL_IDLE_MS: z.coerce.number().default(10 * 60_000),
-  AI_PROVIDER: z.enum(['anthropic', 'openai', 'none']).default('none'),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-6'),
-  OPENAI_API_KEY: z.string().optional(),
-  OPENAI_MODEL: z.string().default('gpt-4o-mini'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(120),
 });
 
