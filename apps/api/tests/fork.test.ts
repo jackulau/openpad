@@ -98,6 +98,47 @@ describe('pad fork', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it('forking an interview pad downgrades the copy to a sandbox', async () => {
+    // Create an interview pad with a question link so we can prove both
+    // kind and questionId are dropped on the fork.
+    // Need an author user for the FK + Prisma-required relation.
+    const authorUser = await prisma.user.findFirst();
+    if (!authorUser) throw new Error('no user');
+    const q = await prisma.question.create({
+      data: {
+        title: 'two sum',
+        body: 'add two numbers',
+        language: 'python',
+        author: { connect: { id: authorUser.id } },
+      },
+    });
+    const interview = await server.inject({
+      method: 'POST',
+      url: '/api/pads',
+      headers: auth(owner),
+      payload: { language: 'python', kind: 'interview' },
+    });
+    const interviewSlug = interview.json().pad.slug;
+    await prisma.pad.update({
+      where: { slug: interviewSlug },
+      data: { questionId: q.id },
+    });
+
+    const fork = await server.inject({
+      method: 'POST',
+      url: `/api/pads/${interviewSlug}/fork`,
+      headers: auth(owner),
+      payload: {},
+    });
+    expect(fork.statusCode).toBe(201);
+    expect(fork.json().pad.kind).toBe('sandbox');
+
+    const forkSlug = fork.json().pad.slug;
+    const forked = await prisma.pad.findUnique({ where: { slug: forkSlug } });
+    expect(forked?.kind).toBe('sandbox');
+    expect(forked?.questionId).toBeNull();
+  });
+
   it('fork carries packages config', async () => {
     await server.inject({
       method: 'PATCH',
