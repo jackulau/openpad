@@ -1,11 +1,22 @@
 # opencoder
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Node ≥20](https://img.shields.io/badge/Node-%E2%89%A520-339933?logo=nodedotjs&logoColor=white)](./.nvmrc)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178c6?logo=typescript&logoColor=white)](./tsconfig.base.json)
+[![Self-hosted](https://img.shields.io/badge/Deploy-Self--hosted-0ea5e9)](./docker-compose.yml)
+
 A self-hosted, open-source **CoderPad-style** collaborative coding pad — for you
 and your friends, on your own port.
 
 > Run it on your machine. Pick a port. Share the URL with friends. Code,
 > debug, run, interview, score — all in real time. No SaaS, no per-seat
 > billing, no AI hiring funnel. Just a programmable workspace you control.
+
+<p align="center">
+  <img src="docs/screenshots/collab-cursors.png" alt="Two collaborators editing the same file with live cursors." width="900" />
+  <br />
+  <em>Two collaborators editing the same file with live cursors.</em>
+</p>
 
 ## Features
 
