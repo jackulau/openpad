@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { canEdit, canManage, getPadAccess } from '../lib/permissions.js';
-import { LANGUAGES, langForFile } from '@opencoder/shared';
+import { langForFile, resolveLanguage } from '@opencoder/shared';
+
+const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
 
 const createBody = z.object({
   name: z
@@ -11,13 +13,13 @@ const createBody = z.object({
     .min(1)
     .max(120)
     .regex(/^[^/\\]+$/, 'no_slashes'),
-  language: z.string().refine((v) => v in LANGUAGES, 'unknown_language').optional(),
+  language: z.string().refine(validLanguage, 'unknown_language').optional(),
   content: z.string().max(256 * 1024).optional(),
 });
 
 const renameBody = z.object({
   name: z.string().trim().min(1).max(120).regex(/^[^/\\]+$/, 'no_slashes').optional(),
-  language: z.string().refine((v) => v in LANGUAGES, 'unknown_language').optional(),
+  language: z.string().refine(validLanguage, 'unknown_language').optional(),
   sortOrder: z.number().int().optional(),
 });
 

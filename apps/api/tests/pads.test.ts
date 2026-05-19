@@ -44,7 +44,7 @@ describe('pads', () => {
     expect(res.statusCode).toBe(201);
     const body = res.json();
     expect(body.pad.slug).toMatch(/^[a-z]+-[a-z]+-/);
-    expect(body.pad.language).toBe('python');
+    expect(body.pad.language).toBe('python312');
     expect(body.pad.myRole).toBe('owner');
 
     const detail = await server.inject({
@@ -67,6 +67,7 @@ describe('pads', () => {
       payload: { language: 'go', kind: 'interview', title: 'My Go Pad' },
     });
     expect(res.statusCode).toBe(201);
+    // 'go' is an alias that resolves to the default version.
     expect(res.json().pad.language).toBe('go');
     expect(res.json().pad.kind).toBe('interview');
     expect(res.json().pad.title).toBe('My Go Pad');

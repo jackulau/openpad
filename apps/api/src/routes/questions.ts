@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { LANGUAGES } from '@opencoder/shared';
+import { resolveLanguage } from '@opencoder/shared';
+
+const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
 
 const upsertBody = z.object({
   title: z.string().trim().min(1).max(200),
   body: z.string().max(20_000),
-  language: z.string().refine((v) => v in LANGUAGES, 'unknown_language').default('python'),
+  language: z.string().refine(validLanguage, 'unknown_language').default('python312'),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
   tags: z.string().max(500).default(''),
 });

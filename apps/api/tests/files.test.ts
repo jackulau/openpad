@@ -45,7 +45,7 @@ describe('files', () => {
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().file.name).toBe('util.py');
-    expect(res.json().file.language).toBe('python');
+    expect(res.json().file.language).toBe('python312');
   });
 
   it('rejects duplicate filename', async () => {
@@ -90,7 +90,7 @@ describe('files', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().file.name).toBe('thing.go');
-    expect(res.json().file.language).toBe('go');
+    expect(res.json().file.language).toBe('go122');
   });
 
   it('deletes a file (but not the last one)', async () => {

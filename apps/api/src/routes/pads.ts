@@ -4,17 +4,20 @@ import { prisma } from '../db.js';
 import { canManage, canView, getPadAccess } from '../lib/permissions.js';
 import { generateSlug } from '../lib/slug.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
-import { LANGUAGES, langForFile } from '@opencoder/shared';
+import { LANGUAGES, langForFile, resolveLanguage } from '@opencoder/shared';
+
+const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
 
 const createBody = z.object({
   title: z.string().trim().min(1).max(120).optional(),
-  language: z.string().refine((v) => v in LANGUAGES, 'unknown_language').optional(),
+  language: z.string().refine(validLanguage, 'unknown_language').optional(),
   kind: z.enum(['sandbox', 'interview']).optional(),
+  template: z.enum(['hello', 'leetcode']).optional(),
 });
 
 const patchBody = z.object({
   title: z.string().trim().min(1).max(120).optional(),
-  language: z.string().refine((v) => v in LANGUAGES, 'unknown_language').optional(),
+  language: z.string().refine(validLanguage, 'unknown_language').optional(),
   kind: z.enum(['sandbox', 'interview']).optional(),
 });
 
@@ -67,9 +70,10 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
     }
-    const language = parsed.data.language ?? 'python';
+    const language = parsed.data.language ?? 'python312';
+    const langSpec = resolveLanguage(language)!;
     const kind = parsed.data.kind ?? 'sandbox';
-    const title = parsed.data.title ?? `${capitalize(language)} pad`;
+    const title = parsed.data.title ?? `${capitalize(langSpec.label)} pad`;
 
     // generate a unique slug (collision retry)
     let slug = generateSlug();
@@ -78,8 +82,11 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
       if (!existing) break;
       slug = generateSlug();
     }
-    const ext = LANGUAGES[language]?.fileExt ?? '.txt';
-    const fileName = `main${ext}`;
+    const ext = langSpec.fileExt ?? '.txt';
+    const fileName = ext === '.java' ? 'Main.java' : ext === '.hs' ? 'Main.hs' : `main${ext}`;
+    const template = parsed.data.template ?? 'hello';
+    const { templateFor } = await import('@opencoder/shared');
+    const content = templateFor(language, template);
     const pad = await prisma.pad.create({
       data: {
         slug,
@@ -92,7 +99,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
           create: {
             name: fileName,
             language: langForFile(fileName) === 'plaintext' ? language : langForFile(fileName),
-            content: starterFor(language),
+            content,
           },
         },
       },
@@ -228,6 +235,75 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     return { ok: true, slug, role: pad.passwordRole };
   });
 
+  // Fork pad — copy all files into a new pad owned by the caller.
+  server.post('/:slug/fork', { preHandler: server.requireAuth }, async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const userId = req.currentUser!.sub;
+    const access = await getPadAccess(slug, userId);
+    if (!access || !canView(access.role)) return reply.code(404).send({ error: 'not_found' });
+
+    const files = await prisma.padFile.findMany({
+      where: { padId: access.pad.id },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+    const packages = await prisma.pad.findUnique({
+      where: { id: access.pad.id },
+      select: { packages: true },
+    });
+    let newSlug = generateSlug();
+    for (let i = 0; i < 5; i++) {
+      const exists = await prisma.pad.findUnique({ where: { slug: newSlug } });
+      if (!exists) break;
+      newSlug = generateSlug();
+    }
+    const fork = await prisma.pad.create({
+      data: {
+        slug: newSlug,
+        title: `${access.pad.title} (fork)`,
+        language: access.pad.language,
+        kind: 'sandbox',
+        ownerId: userId,
+        packages: packages?.packages ?? null,
+        members: { create: { userId, role: 'owner' } },
+        files: {
+          create: files.map((f, i) => ({
+            name: f.name,
+            language: f.language,
+            content: f.content,
+            sortOrder: i,
+          })),
+        },
+      },
+    });
+    return reply.code(201).send({ pad: summarize(fork, 'owner') });
+  });
+
+  // Patch packages config — owner only.
+  server.patch('/:slug/packages', { preHandler: server.requireAuth }, async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const userId = req.currentUser!.sub;
+    const access = await getPadAccess(slug, userId);
+    if (!access) return reply.code(404).send({ error: 'not_found' });
+    if (!canManage(access.role)) return reply.code(403).send({ error: 'forbidden' });
+    const parsed = z
+      .object({
+        pip: z.array(z.string().max(120)).max(60).optional(),
+        npm: z.array(z.string().max(120)).max(60).optional(),
+        cargo: z.array(z.string().max(120)).max(60).optional(),
+        gem: z.array(z.string().max(120)).max(60).optional(),
+        apt: z.array(z.string().max(120)).max(60).optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    await prisma.pad.update({
+      where: { id: access.pad.id },
+      data: { packages: JSON.stringify(parsed.data) },
+    });
+    return { ok: true, packages: parsed.data };
+  });
+
   // Delete pad
   server.delete('/:slug', { preHandler: server.requireAuth }, async (req, reply) => {
     const { slug } = req.params as { slug: string };
@@ -242,31 +318,4 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function starterFor(language: string): string {
-  switch (language) {
-    case 'python':
-      return 'print("hello, friend!")\n';
-    case 'javascript':
-      return 'console.log("hello, friend!");\n';
-    case 'typescript':
-      return 'const greet = (who: string) => `hello, ${who}!`;\nconsole.log(greet("friend"));\n';
-    case 'go':
-      return 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("hello, friend!")\n}\n';
-    case 'rust':
-      return 'fn main() {\n    println!("hello, friend!");\n}\n';
-    case 'java':
-      return 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("hello, friend!");\n    }\n}\n';
-    case 'cpp':
-      return '#include <iostream>\nint main() {\n    std::cout << "hello, friend!\\n";\n}\n';
-    case 'c':
-      return '#include <stdio.h>\nint main() {\n    printf("hello, friend!\\n");\n    return 0;\n}\n';
-    case 'ruby':
-      return 'puts "hello, friend!"\n';
-    case 'csharp':
-      return 'Console.WriteLine("hello, friend!");\n';
-    default:
-      return '';
-  }
 }

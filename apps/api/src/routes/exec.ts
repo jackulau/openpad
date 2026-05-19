@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { canEdit, getPadAccess } from '../lib/permissions.js';
-import { LANGUAGES } from '@opencoder/shared';
+import { resolveLanguage } from '@opencoder/shared';
 import { runCode } from '../exec/runner.js';
 import { prisma } from '../db.js';
 
+const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
+
 const body = z.object({
-  language: z.string().refine((v) => v in LANGUAGES, 'unknown_language').optional(),
+  language: z.string().refine(validLanguage, 'unknown_language').optional(),
   source: z.string().max(256 * 1024),
   stdin: z.string().max(64 * 1024).optional(),
   filename: z.string().max(120).optional(),

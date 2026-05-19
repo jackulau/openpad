@@ -1,67 +1,37 @@
 import type { RunRequest, RunResult } from '@opencoder/shared';
-import { LANGUAGES } from './languages.js';
+import { resolveLanguage } from './languages.js';
 import { env } from '../env.js';
 import { makeSandbox } from './sandbox.js';
 import { isDockerAvailable, runInDocker } from './docker.js';
 import { runProcessIn } from './local.js';
 
-const DEFAULT_FILENAME: Record<string, string> = {
-  python: 'main.py',
-  javascript: 'main.js',
-  typescript: 'main.ts',
-  go: 'main.go',
-  rust: 'main.rs',
+// Per-group canonical filename. The runner picks `main{ext}` for any unknown id;
+// these overrides keep Java's `Main.java`, Haskell's `Main.hs`, etc.
+const FILENAME_OVERRIDES: Record<string, string> = {
   java: 'Main.java',
-  cpp: 'main.cpp',
-  c: 'main.c',
-  ruby: 'main.rb',
-  csharp: 'main.cs',
-  kotlin: 'main.kt',
-  swift: 'main.swift',
-  php: 'main.php',
-  bash: 'main.sh',
-  lua: 'main.lua',
-  elixir: 'main.exs',
   haskell: 'Main.hs',
-  scala: 'main.scala',
-  perl: 'main.pl',
-  r: 'main.r',
-  julia: 'main.jl',
-  zig: 'main.zig',
-  ocaml: 'main.ml',
-  clojure: 'main.clj',
-  dart: 'main.dart',
-  fsharp: 'main.fsx',
-  sql: 'main.sql',
 };
 
 export async function runCode(req: RunRequest): Promise<RunResult> {
-  const lang = LANGUAGES[req.language];
+  const lang = resolveLanguage(req.language);
   if (!lang) {
     return badLanguage(req.language);
   }
-  const filename = req.filename ?? DEFAULT_FILENAME[lang.id] ?? `main${lang.fileExt}`;
+  const groupOverride = lang.group ? FILENAME_OVERRIDES[lang.group] : undefined;
+  const filename = req.filename ?? groupOverride ?? `main${lang.fileExt}`;
   const timeoutMs = clampTimeout(req.timeoutMs);
   const sandbox = await makeSandbox(filename, req.source);
   try {
     const docker = await isDockerAvailable();
     if (docker && lang.docker) {
       const r = await runInDocker(lang, sandbox.dir, filename, req.stdin, timeoutMs);
-      return {
-        ...r,
-        runner: 'docker',
-        language: lang.id,
-      };
+      return { ...r, runner: 'docker', language: lang.id };
     }
     if (lang.local) {
       const args = lang.local.runCmd(filename);
       const [cmd, ...rest] = args;
       const r = await runProcessIn(sandbox.dir, cmd, rest, req.stdin, timeoutMs);
-      return {
-        ...r,
-        runner: 'subprocess',
-        language: lang.id,
-      };
+      return { ...r, runner: 'subprocess', language: lang.id };
     }
     return {
       stdout: '',
