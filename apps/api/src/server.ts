@@ -5,6 +5,8 @@ import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import { env } from './env.js';
+import { authPlugin } from './plugins/auth.js';
+import { registerAuthRoutes } from './routes/auth.js';
 
 export type AppServer = FastifyInstance;
 
@@ -39,9 +41,12 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
     });
   }
   await server.register(websocket, { options: { maxPayload: 4 * 1024 * 1024 } });
+  await server.register(authPlugin);
 
   server.get('/health', async () => ({ ok: true, name: 'opencoder', version: '0.1.0' }));
   server.get('/api/health', async () => ({ ok: true }));
+
+  await server.register(registerAuthRoutes, { prefix: '/api/auth' });
 
   return server;
 }
