@@ -9,6 +9,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "db:setup": "pnpm --filter @opencoder/api exec prisma generate && pnpm --filter @opencoder/api exec prisma migrate deploy",
+    "predev": "pnpm db:setup",
     "dev": "concurrently -k -n api,web -c blue,green \"pnpm --filter @opencoder/api dev\" \"pnpm --filter @opencoder/web dev\"",
     "build": "pnpm -r --filter @opencoder/shared build && pnpm -r --filter @opencoder/api build && pnpm -r --filter @opencoder/web build",
     "start": "pnpm --filter @opencoder/api start",
@@ -17,6 +19,7 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
+    "smoke": "bash scripts/smoke.sh",
     "clean": "pnpm -r exec rm -rf dist .turbo node_modules/.cache"
   },
   "devDependencies": {
