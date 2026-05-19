@@ -16,6 +16,23 @@ const DEFAULT_FILENAME: Record<string, string> = {
   c: 'main.c',
   ruby: 'main.rb',
   csharp: 'main.cs',
+  kotlin: 'main.kt',
+  swift: 'main.swift',
+  php: 'main.php',
+  bash: 'main.sh',
+  lua: 'main.lua',
+  elixir: 'main.exs',
+  haskell: 'Main.hs',
+  scala: 'main.scala',
+  perl: 'main.pl',
+  r: 'main.r',
+  julia: 'main.jl',
+  zig: 'main.zig',
+  ocaml: 'main.ml',
+  clojure: 'main.clj',
+  dart: 'main.dart',
+  fsharp: 'main.fsx',
+  sql: 'main.sql',
 };
 
 export async function runCode(req: RunRequest): Promise<RunResult> {

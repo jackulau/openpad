@@ -18,6 +18,8 @@ import { execApi } from '../lib/exec';
 import { useCollab } from '../lib/useCollab';
 import { useAuth } from '../lib/authStore';
 import { canEditRole } from '../lib/roles';
+import { passwordApi } from '../lib/passwords';
+import { HttpError } from '../lib/api';
 
 type RightTab = 'output' | 'chat' | 'terminal' | 'review';
 
@@ -111,12 +113,7 @@ export function Pad() {
   }, [run, editAllowed]);
 
   if (pad.isLoading) return <div className="p-8 text-zinc-400">loading…</div>;
-  if (pad.error)
-    return (
-      <div className="p-8 text-red-400">
-        Couldn't load pad. <Link to="/dashboard" className="underline">Back</Link>
-      </div>
-    );
+  if (pad.error) return <UnlockOrError slug={slug} onUnlocked={() => pad.refetch()} />;
   if (!pad.data) return null;
 
   const isInterview = pad.data.pad.kind === 'interview';
@@ -243,6 +240,98 @@ export function Pad() {
       </div>
 
       {invitesOpen && <InvitesPanel slug={slug} onClose={() => setInvitesOpen(false)} />}
+    </div>
+  );
+}
+
+function UnlockOrError({ slug, onUnlocked }: { slug: string; onUnlocked: () => void }) {
+  const preview = useQuery({
+    queryKey: ['pad-preview', slug],
+    queryFn: () => passwordApi.preview(slug),
+    retry: false,
+  });
+  const [password, setPassword] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const unlock = useMutation({
+    mutationFn: () => passwordApi.unlock(slug, password),
+    onSuccess: () => {
+      setErr(null);
+      onUnlocked();
+    },
+    onError: (e) => {
+      setErr(
+        e instanceof HttpError
+          ? e.error === 'wrong_password'
+            ? 'Wrong password.'
+            : e.error
+          : 'Failed',
+      );
+    },
+  });
+  if (preview.isLoading)
+    return <div className="p-8 text-zinc-400">checking pad…</div>;
+  if (preview.error || !preview.data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="card p-6 max-w-md w-full space-y-2 text-center">
+          <h2 className="text-lg font-semibold">Pad not found</h2>
+          <p className="text-sm text-zinc-400">
+            This pad doesn't exist or has been deleted.
+          </p>
+          <Link to="/dashboard" className="btn-secondary inline-flex mt-2">
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  if (!preview.data.hasPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="card p-6 max-w-md w-full space-y-2 text-center">
+          <h2 className="text-lg font-semibold">Access denied</h2>
+          <p className="text-sm text-zinc-400">
+            You're not a member of this pad. Ask the owner for an invite.
+          </p>
+          <Link to="/dashboard" className="btn-secondary inline-flex mt-2">
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <form
+        className="card p-6 max-w-md w-full space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (password) unlock.mutate();
+        }}
+      >
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">{preview.data.title}</h2>
+          <p className="text-sm text-zinc-400">This pad is password protected.</p>
+        </div>
+        <label className="block">
+          <span className="text-xs uppercase tracking-wide text-zinc-500">Password</span>
+          <input
+            type="password"
+            autoFocus
+            className="input mt-1"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        {err && <div className="text-sm text-red-400" role="alert">{err}</div>}
+        <button
+          type="submit"
+          className="btn-primary w-full"
+          disabled={!password || unlock.isPending}
+        >
+          {unlock.isPending ? 'Unlocking…' : 'Unlock'}
+        </button>
+      </form>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../db.js';
 import { canManage, canView, getPadAccess } from '../lib/permissions.js';
 import { generateSlug } from '../lib/slug.js';
+import { hashPassword, verifyPassword } from '../lib/password.js';
 import { LANGUAGES, langForFile } from '@opencoder/shared';
 
 const createBody = z.object({
@@ -25,6 +26,7 @@ function summarize(
     language: string;
     kind: string;
     ownerId: string;
+    passwordHash?: string | null;
     updatedAt: Date;
     createdAt: Date;
   },
@@ -37,6 +39,7 @@ function summarize(
     language: pad.language,
     kind: pad.kind,
     ownerId: pad.ownerId,
+    hasPassword: !!pad.passwordHash,
     updatedAt: pad.updatedAt.toISOString(),
     createdAt: pad.createdAt.toISOString(),
     myRole,
@@ -153,6 +156,76 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
       data: parsed.data,
     });
     return { pad: summarize(updated, access.role) };
+  });
+
+  // Public-ish preview: returns minimal info (title, hasPassword) for the
+  // unlock flow. Requires auth but not membership.
+  server.get(
+    '/:slug/preview',
+    { preHandler: server.requireAuth },
+    async (req, reply) => {
+      const { slug } = req.params as { slug: string };
+      const pad = await prisma.pad.findUnique({
+        where: { slug },
+        select: { slug: true, title: true, kind: true, passwordHash: true },
+      });
+      if (!pad) return reply.code(404).send({ error: 'not_found' });
+      return {
+        slug: pad.slug,
+        title: pad.title,
+        kind: pad.kind,
+        hasPassword: !!pad.passwordHash,
+      };
+    },
+  );
+
+  // Set/clear pad password
+  server.patch('/:slug/password', { preHandler: server.requireAuth }, async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const userId = req.currentUser!.sub;
+    const access = await getPadAccess(slug, userId);
+    if (!access) return reply.code(404).send({ error: 'not_found' });
+    if (!canManage(access.role)) return reply.code(403).send({ error: 'forbidden' });
+    const parsed = z
+      .object({
+        password: z.string().min(0).max(200).nullable().optional(),
+        role: z.enum(['collaborator', 'viewer', 'candidate']).optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    const data: { passwordHash: string | null; passwordRole?: string } = {
+      passwordHash: parsed.data.password
+        ? await hashPassword(parsed.data.password)
+        : null,
+    };
+    if (parsed.data.role) data.passwordRole = parsed.data.role;
+    await prisma.pad.update({ where: { id: access.pad.id }, data });
+    return { ok: true, hasPassword: !!data.passwordHash };
+  });
+
+  // Unlock pad with password — joins the calling user as the pad's passwordRole
+  server.post('/:slug/unlock', { preHandler: server.requireAuth }, async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const userId = req.currentUser!.sub;
+    const parsed = z.object({ password: z.string().min(1).max(200) }).safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    const pad = await prisma.pad.findUnique({ where: { slug } });
+    if (!pad) return reply.code(404).send({ error: 'not_found' });
+    if (!pad.passwordHash) return reply.code(400).send({ error: 'no_password' });
+    const ok = await verifyPassword(parsed.data.password, pad.passwordHash);
+    if (!ok) return reply.code(401).send({ error: 'wrong_password' });
+    if (pad.ownerId !== userId) {
+      await prisma.padMember.upsert({
+        where: { padId_userId: { padId: pad.id, userId } },
+        update: {},
+        create: { padId: pad.id, userId, role: pad.passwordRole },
+      });
+    }
+    return { ok: true, slug, role: pad.passwordRole };
   });
 
   // Delete pad

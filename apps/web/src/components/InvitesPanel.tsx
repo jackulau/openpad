@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invitesApi } from '../lib/invites';
+import { passwordApi } from '../lib/passwords';
 import { HttpError } from '../lib/api';
 
 interface Props {
@@ -88,6 +89,8 @@ export function InvitesPanel({ slug, onClose }: Props) {
         </div>
         {err && <div className="text-xs text-red-400">{err}</div>}
 
+        <PasswordSection slug={slug} />
+
         <div className="space-y-2">
           <h3 className="text-xs uppercase tracking-wide text-zinc-500">Active invites</h3>
           {list.isLoading && <div className="text-zinc-500 text-sm">loading…</div>}
@@ -125,6 +128,74 @@ export function InvitesPanel({ slug, onClose }: Props) {
           </ul>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PasswordSection({ slug }: { slug: string }) {
+  const qc = useQueryClient();
+  const preview = useQuery({
+    queryKey: ['pad-preview', slug],
+    queryFn: () => passwordApi.preview(slug),
+  });
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'collaborator' | 'viewer' | 'candidate'>('collaborator');
+  const [err, setErr] = useState<string | null>(null);
+  const set = useMutation({
+    mutationFn: () => passwordApi.set(slug, password, role),
+    onSuccess: () => {
+      setPassword('');
+      setErr(null);
+      qc.invalidateQueries({ queryKey: ['pad-preview', slug] });
+    },
+    onError: (e) => setErr(e instanceof HttpError ? e.error : 'Failed'),
+  });
+  const clear = useMutation({
+    mutationFn: () => passwordApi.set(slug, null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pad-preview', slug] }),
+  });
+  return (
+    <div className="space-y-2 border-t border-zinc-800 pt-3">
+      <h3 className="text-xs uppercase tracking-wide text-zinc-500">Password gate</h3>
+      <p className="text-xs text-zinc-500">
+        Optional. Anyone with the link can join after entering this password —{' '}
+        {preview.data?.hasPassword ? 'currently enabled.' : 'currently disabled.'}
+      </p>
+      <div className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-2">
+        <input
+          className="input"
+          type="password"
+          placeholder={preview.data?.hasPassword ? 'change password…' : 'set a password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <select
+          className="input"
+          value={role}
+          onChange={(e) => setRole(e.target.value as typeof role)}
+        >
+          <option value="collaborator">Collaborator</option>
+          <option value="viewer">Viewer</option>
+          <option value="candidate">Candidate</option>
+        </select>
+        <button
+          className="btn-primary"
+          onClick={() => password && set.mutate()}
+          disabled={set.isPending || !password}
+        >
+          Save
+        </button>
+        {preview.data?.hasPassword && (
+          <button
+            className="btn-ghost text-red-400"
+            onClick={() => clear.mutate()}
+            disabled={clear.isPending}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      {err && <div className="text-xs text-red-400">{err}</div>}
     </div>
   );
 }
