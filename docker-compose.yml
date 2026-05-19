@@ -1,0 +1,41 @@
+# opencoder — single-host self-deployment
+#
+# Pick the port you want to share with friends (defaults to 4000),
+# point a secret JWT at it, optionally wire an AI key, and run
+#   docker compose up --build
+#
+# Then share http://<your-ip>:${PORT} with your friends.
+# Use Tailscale or Cloudflare Tunnel if you want them on a different network.
+
+services:
+  opencoder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opencoder
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      HOST: "0.0.0.0"
+      # Set a strong value in .env; this default is ONLY for `docker compose config` validation.
+      JWT_SECRET: "${JWT_SECRET:-please-override-me-in-dot-env-file-32chars}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:4000}"
+      DATABASE_URL: "${DATABASE_URL:-file:/data/opencoder.db}"
+      DATA_DIR: "/data"
+      AI_PROVIDER: "${AI_PROVIDER:-none}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ANTHROPIC_MODEL: "${ANTHROPIC_MODEL:-claude-sonnet-4-6}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      EXEC_FORCE_LOCAL: "${EXEC_FORCE_LOCAL:-false}"
+    volumes:
+      - opencoder_data:/data
+      # Mount the host docker socket so the api can spawn sandboxed
+      # language containers. Comment this out to force-local exec.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  opencoder_data:

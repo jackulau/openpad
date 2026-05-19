@@ -1,8 +1,12 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
+import staticPlugin from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { env } from './env.js';
 import { authPlugin } from './plugins/auth.js';
@@ -72,5 +76,31 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerAIReviewRoutes, { prefix: '/api/pads' });
   await registerWebSocket(server);
 
+  // Serve the SPA bundle alongside the API when it has been built.
+  await maybeRegisterStaticWeb(server);
+
   return server;
+}
+
+async function maybeRegisterStaticWeb(server: FastifyInstance): Promise<void> {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  // try common locations: bundled docker layout + dev layout
+  const candidates = [
+    path.resolve(here, '..', '..', '..', 'web-dist'), // docker layout
+    path.resolve(here, '..', '..', '..', 'web', 'dist'), // monorepo dev
+    path.resolve(here, '..', '..', '..', '..', 'apps', 'web', 'dist'),
+  ];
+  const root = candidates.find((p) => existsSync(p));
+  if (!root) return;
+  await server.register(staticPlugin, {
+    root,
+    prefix: '/',
+    decorateReply: false,
+  });
+  server.setNotFoundHandler(async (req, reply) => {
+    if (req.url.startsWith('/api/') || req.url.startsWith('/ws/') || req.url.startsWith('/health')) {
+      return reply.code(404).send({ error: 'not_found' });
+    }
+    return reply.type('text/html').sendFile('index.html');
+  });
 }
