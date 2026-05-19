@@ -17,6 +17,8 @@ import {
   moveStroke as libMoveStroke,
   resizeStroke as libResizeStroke,
 } from '../lib/canvas-hit';
+import { catmullRomPath, inViewport } from '../lib/canvas-smooth';
+import { exportPNG, exportSVG } from '../lib/canvas-export';
 
 type Tool = 'select' | 'pen' | 'rect' | 'ellipse' | 'arrow' | 'text' | 'note' | 'erase';
 
@@ -582,6 +584,27 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
           </button>
           <div className="mx-1 h-5 w-px bg-line" />
           <button
+            onClick={() => {
+              const filename = `pad-${effectiveSlug || 'canvas'}-${new Date().toISOString().slice(0, 10)}.svg`;
+              exportSVG(strokes as Stroke[], filename);
+            }}
+            className="btn-ghost !px-2 !py-1 text-subtle hover:text-primary"
+            title="Export SVG"
+          >
+            SVG
+          </button>
+          <button
+            onClick={() => {
+              const filename = `pad-${effectiveSlug || 'canvas'}-${new Date().toISOString().slice(0, 10)}.png`;
+              void exportPNG(strokes as Stroke[], filename);
+            }}
+            className="btn-ghost !px-2 !py-1 text-subtle hover:text-primary"
+            title="Export PNG"
+          >
+            PNG
+          </button>
+          <div className="mx-1 h-5 w-px bg-line" />
+          <button
             onClick={clearAll}
             className="btn-ghost !px-2 !py-1 text-subtle hover:text-danger"
             title="Clear all"
@@ -619,9 +642,27 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
               </marker>
             </defs>
             <g transform={`translate(${-viewport.x} ${-viewport.y}) scale(${viewport.zoom})`}>
-              {strokes.map((s) => (
-                <StrokeShape key={s.id} stroke={s} />
-              ))}
+              {(() => {
+                // Viewport culling — skip strokes whose bbox is fully off-screen.
+                // World-coord visible bounds = viewport.x..(viewport.x+w/z) etc.
+                // Use clientWidth/Height so we don't recompute layout on every
+                // render; svgRef may be null pre-mount (return full list).
+                const rect = svgRef.current?.getBoundingClientRect();
+                if (!rect) {
+                  return strokes.map((s) => <StrokeShape key={s.id} stroke={s} />);
+                }
+                const z = Math.max(0.1, viewport.zoom);
+                const visible = {
+                  minX: viewport.x / z,
+                  minY: viewport.y / z,
+                  maxX: (viewport.x + rect.width) / z,
+                  maxY: (viewport.y + rect.height) / z,
+                };
+                const margin = 200 / z;
+                return strokes
+                  .filter((s) => inViewport(strokeBounds(s), visible, margin))
+                  .map((s) => <StrokeShape key={s.id} stroke={s} />);
+              })()}
               {draft && <StrokeShape stroke={draft} />}
               {selectedIds.size > 0 && tool === 'select' && (() => {
                 const selectedStrokes = strokes.filter((s) => selectedIds.has(s.id));
@@ -793,7 +834,8 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
 function StrokeShape({ stroke: s }: { stroke: Stroke }) {
   switch (s.kind) {
     case 'pen': {
-      const d = s.points.length === 0 ? '' : `M ${s.points.map(([x, y]) => `${x} ${y}`).join(' L ')}`;
+      // Catmull-Rom spline → smoother than the old line-list for hand-drawn paths.
+      const d = catmullRomPath(s.points);
       return <path d={d} stroke={s.color} strokeWidth={s.sw} fill="none" strokeLinecap="round" strokeLinejoin="round" />;
     }
     case 'rect': {
