@@ -18,6 +18,7 @@ import {
 import { registerPlaybackRoutes } from './routes/playback.js';
 import { registerQuestionRoutes } from './routes/questions.js';
 import { registerInterviewRoutes } from './routes/interviews.js';
+import { registerAIReviewRoutes } from './routes/aiReview.js';
 import { registerWebSocket } from './ws/index.js';
 
 export type AppServer = FastifyInstance;
@@ -68,6 +69,7 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerPlaybackRoutes, { prefix: '/api/pads' });
   await server.register(registerQuestionRoutes, { prefix: '/api/questions' });
   await server.register(registerInterviewRoutes, { prefix: '/api/pads' });
+  await server.register(registerAIReviewRoutes, { prefix: '/api/pads' });
   await registerWebSocket(server);
 
   return server;
