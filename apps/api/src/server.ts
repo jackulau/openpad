@@ -14,6 +14,7 @@ import { authPlugin } from './plugins/auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPadRoutes } from './routes/pads.js';
 import { registerExecRoutes } from './routes/exec.js';
+import { registerExecStreamRoutes } from './routes/exec-stream.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerFileRoutes } from './routes/files.js';
 import {
@@ -155,6 +156,7 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerAuthRoutes, { prefix: '/api/auth' });
   await server.register(registerPadRoutes, { prefix: '/api/pads' });
   await server.register(registerExecRoutes, { prefix: '/api/pads' });
+  await server.register(registerExecStreamRoutes, { prefix: '/api/pads' });
   await server.register(registerFileRoutes, { prefix: '/api/pads' });
   await server.register(registerChatRoutes, { prefix: '/api/pads' });
   await server.register(registerInviteRoutes, { prefix: '/api/pads' });
