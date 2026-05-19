@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invitesApi } from '../lib/invites';
 import { passwordApi } from '../lib/passwords';
 import { HttpError } from '../lib/api';
+import { copyToClipboard, useToasts } from '../lib/toast';
 
 interface Props {
   slug: string;
@@ -109,12 +110,15 @@ export function InvitesPanel({ slug, onClose }: Props) {
                     <span className="text-xs text-brand-400">{inv.role}</span>
                     {inv.usedAt && <span className="text-xs text-zinc-500">used</span>}
                   </div>
-                  <input
-                    readOnly
-                    className="input !text-xs mt-1"
-                    value={inv.url}
-                    onFocus={(e) => e.currentTarget.select()}
-                  />
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      readOnly
+                      className="input !text-xs flex-1"
+                      value={inv.url}
+                      onFocus={(e) => e.currentTarget.select()}
+                    />
+                    <CopyButton text={inv.url} />
+                  </div>
                 </div>
                 <button
                   className="btn-ghost text-zinc-400 hover:text-red-400"
@@ -129,6 +133,22 @@ export function InvitesPanel({ slug, onClose }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const push = useToasts((s) => s.push);
+  return (
+    <button
+      className="btn-secondary !py-1 !text-xs"
+      onClick={async () => {
+        const ok = await copyToClipboard(text);
+        push(ok ? 'Link copied' : 'Copy failed', ok ? 'success' : 'error');
+      }}
+      title="Copy"
+    >
+      Copy
+    </button>
   );
 }
 
