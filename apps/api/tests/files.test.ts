@@ -22,8 +22,8 @@ beforeEach(async () => {
   await truncateAll(prisma);
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: 'f@b.com', name: 'F', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: 'f@b.com', name: 'F'},
   });
   token = r.json().token;
   const p = await server.inject({
@@ -123,8 +123,8 @@ describe('files', () => {
   it('forbids file ops from non-members', async () => {
     const r = await server.inject({
       method: 'POST',
-      url: '/api/auth/register',
-      payload: { email: 'x@b.com', name: 'X', password: 'password1234' },
+      url: '/api/auth/guest',
+      payload: { email: 'x@b.com', name: 'X'},
     });
     const otherToken = r.json().token;
     const res = await server.inject({

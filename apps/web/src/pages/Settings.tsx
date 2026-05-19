@@ -15,10 +15,7 @@ export function Settings() {
   const { theme, setTheme } = useTheme();
 
   const [name, setName] = useState(user?.name ?? '');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [confirmText, setConfirmText] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
 
   const saveName = useMutation({
     mutationFn: () => settingsApi.patchMe({ name }),
@@ -29,28 +26,8 @@ export function Settings() {
     onError: (e) => push(e instanceof HttpError ? e.error : 'Failed', 'error'),
   });
 
-  const savePassword = useMutation({
-    mutationFn: () => settingsApi.patchMe({ currentPassword, newPassword }),
-    onSuccess: () => {
-      setCurrentPassword('');
-      setNewPassword('');
-      push('Password updated', 'success');
-    },
-    onError: (e) => {
-      if (e instanceof HttpError) {
-        push(
-          e.error === 'wrong_current_password'
-            ? 'Wrong current password.'
-            : e.error,
-          'error',
-        );
-      } else push('Failed', 'error');
-    },
-  });
-
   const deleteAcc = useMutation({
-    mutationFn: () =>
-      settingsApi.deleteMe({ confirm: 'DELETE', password: deletePassword }),
+    mutationFn: () => settingsApi.deleteMe({ confirm: 'DELETE' }),
     onSuccess: async () => {
       setToken(null);
       await logout().catch(() => null);
@@ -97,7 +74,9 @@ export function Settings() {
               Save name
             </button>
           </form>
-          <p className="text-xs text-subtle">Email: {user.email}</p>
+          <p className="text-xs text-subtle">
+            No email or password — opencoder uses name-only signup. Your token lives in this browser only.
+          </p>
         </section>
 
         <section className="card p-5 space-y-4">
@@ -118,45 +97,6 @@ export function Settings() {
           </div>
         </section>
 
-        <section className="card p-5 space-y-4">
-          <h2 className="text-lg font-semibold">Change password</h2>
-          <form
-            className="space-y-3"
-            onSubmit={(e: FormEvent) => {
-              e.preventDefault();
-              savePassword.mutate();
-            }}
-          >
-            <label className="block">
-              <span className="text-sm text-secondary">Current password</span>
-              <input
-                type="password"
-                className="input mt-1"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm text-secondary">New password</span>
-              <input
-                type="password"
-                className="input mt-1"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                minLength={8}
-                autoComplete="new-password"
-              />
-            </label>
-            <button
-              className="btn-primary"
-              disabled={!currentPassword || newPassword.length < 8 || savePassword.isPending}
-            >
-              Change password
-            </button>
-          </form>
-        </section>
-
         <section className="card p-5 space-y-4 border-red-700/40">
           <h2 className="text-lg font-semibold text-red-300">Danger zone</h2>
           <p className="text-sm text-secondary">
@@ -166,11 +106,7 @@ export function Settings() {
             className="space-y-3"
             onSubmit={(e: FormEvent) => {
               e.preventDefault();
-              if (
-                confirmText === 'DELETE' &&
-                deletePassword &&
-                confirm('Permanently delete this account?')
-              ) {
+              if (confirmText === 'DELETE' && confirm('Permanently delete this account?')) {
                 deleteAcc.mutate();
               }
             }}
@@ -186,20 +122,9 @@ export function Settings() {
                 placeholder="DELETE"
               />
             </label>
-            <label className="block">
-              <span className="text-sm text-secondary">Password</span>
-              <input
-                type="password"
-                className="input mt-1"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-              />
-            </label>
             <button
               className="btn bg-red-600 hover:bg-red-500 text-white"
-              disabled={
-                confirmText !== 'DELETE' || !deletePassword || deleteAcc.isPending
-              }
+              disabled={confirmText !== 'DELETE' || deleteAcc.isPending}
             >
               {deleteAcc.isPending ? 'Deleting…' : 'Delete account'}
             </button>

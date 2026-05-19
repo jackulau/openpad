@@ -15,7 +15,8 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return <div className="p-8 text-secondary">loading…</div>;
   }
   if (!user) {
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+    // No /login page anymore — bounce back to landing where the user picks a name.
+    return <Navigate to={`/?next=${encodeURIComponent(location.pathname)}`} replace />;
   }
   return <>{children}</>;
 }

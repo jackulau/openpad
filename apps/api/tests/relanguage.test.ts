@@ -11,8 +11,8 @@ let slug: string;
 async function register(): Promise<void> {
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: `rl-${Date.now()}@example.com`, name: 'X', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: `rl-${Date.now()}@example.com`, name: 'X'},
   });
   token = r.json().token;
 }
@@ -122,8 +122,8 @@ describe('PATCH /:slug/files/:fileId/relanguage', () => {
     // make a second user with no membership
     const other = await server.inject({
       method: 'POST',
-      url: '/api/auth/register',
-      payload: { email: `rl2-${Date.now()}@example.com`, name: 'O', password: 'password1234' },
+      url: '/api/auth/guest',
+      payload: { email: `rl2-${Date.now()}@example.com`, name: 'O'},
     });
     const otherToken = other.json().token;
     const res = await server.inject({

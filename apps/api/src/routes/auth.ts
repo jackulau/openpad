@@ -3,41 +3,37 @@ import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { clearToken, issueToken } from '../lib/auth.js';
-import { hashPassword, verifyPassword } from '../lib/password.js';
+import { hashPassword } from '../lib/password.js';
 import { randomToken } from '../lib/slug.js';
 import { recordAudit } from '../lib/audit.js';
 
-const registerBody = z.object({
-  email: z.string().email().max(254),
-  name: z.string().trim().min(1).max(80),
-  password: z.string().min(8).max(200),
-});
-
-const loginBody = z.object({
-  email: z.string().email().max(254),
-  password: z.string().min(1).max(200),
-});
-
-// Rate limits for auth endpoints. Picked to allow real humans (multiple tries
-// on a forgotten password, friends typing names) while blocking unauth abuse.
+// Rate limit for guest signup. Friction-free auth: open-source self-hosters
+// want one button → name → in. No email, no password, no recovery flow.
 const GUEST_RATE = { max: 10, timeWindow: '1 minute' };
-const REGISTER_RATE = { max: 5, timeWindow: '1 minute' };
-const LOGIN_RATE = { max: 10, timeWindow: '1 minute' };
 
 export async function registerAuthRoutes(server: FastifyInstance): Promise<void> {
-  // Friction-free signup: just pick a name. Returns a token immediately.
-  // Use this for the friends-only flow. /register stays for users who want
-  // an email + password they can log back in with.
+  // The ONLY signup path. Pick a name, get a token. The synthetic email + random
+  // password kept under the hood satisfy the unique-email constraint without
+  // exposing those concepts to the user.
   server.post('/guest', { config: { rateLimit: GUEST_RATE } }, async (req, reply) => {
     const parsed = z
-      .object({ name: z.string().trim().min(1).max(80) })
+      .object({
+        name: z.string().trim().min(1).max(80),
+        // Optional stable email used by integration tests for cross-lookup.
+        // Never sent by the UI — the user always sees a name-only form.
+        email: z.string().email().max(254).optional(),
+      })
       .safeParse(req.body ?? {});
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
     }
-    // Stable, opaque email so the unique-on-email constraint doesn't collide.
+    const lcEmail = parsed.data.email?.toLowerCase();
+    if (lcEmail) {
+      const existing = await prisma.user.findUnique({ where: { email: lcEmail } });
+      if (existing) return reply.code(409).send({ error: 'email_taken' });
+    }
     const handle = randomToken(10).toLowerCase();
-    const email = `guest-${handle}@local`;
+    const email = lcEmail ?? `guest-${handle}@local`;
     const password = randomBytes(24).toString('hex');
     const passwordHash = await hashPassword(password);
     const user = await prisma.user.create({
@@ -45,49 +41,6 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     });
     const token = await issueToken(reply, { sub: user.id, email: user.email, name: user.name });
     return reply.code(201).send({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
-    });
-  });
-
-  server.post('/register', { config: { rateLimit: REGISTER_RATE } }, async (req, reply) => {
-    const parsed = registerBody.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
-    }
-    const { email, name, password } = parsed.data;
-    const lcEmail = email.toLowerCase();
-    const existing = await prisma.user.findUnique({ where: { email: lcEmail } });
-    if (existing) return reply.code(409).send({ error: 'email_taken' });
-    const passwordHash = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: { email: lcEmail, name, passwordHash },
-    });
-    const token = await issueToken(reply, { sub: user.id, email: user.email, name: user.name });
-    return reply.code(201).send({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
-    });
-  });
-
-  server.post('/login', { config: { rateLimit: LOGIN_RATE } }, async (req, reply) => {
-    const parsed = loginBody.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
-    }
-    const { email, password } = parsed.data;
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (!user) {
-      recordAudit({ action: 'login.fail', target: email.toLowerCase(), req, meta: { reason: 'no_user' } });
-      return reply.code(401).send({ error: 'invalid_credentials' });
-    }
-    const ok = await verifyPassword(password, user.passwordHash);
-    if (!ok) {
-      recordAudit({ action: 'login.fail', userId: user.id, target: email.toLowerCase(), req, meta: { reason: 'bad_password' } });
-      return reply.code(401).send({ error: 'invalid_credentials' });
-    }
-    const token = await issueToken(reply, { sub: user.id, email: user.email, name: user.name });
-    return reply.send({
       token,
       user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
     });
@@ -107,14 +60,11 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     };
   });
 
-  // PATCH /me — change name and/or password.
+  // PATCH /me — change display name. No password concept since auth is
+  // name-only.
   server.patch('/me', { preHandler: server.requireAuth }, async (req, reply) => {
     const parsed = z
-      .object({
-        name: z.string().trim().min(1).max(80).optional(),
-        currentPassword: z.string().min(1).max(200).optional(),
-        newPassword: z.string().min(8).max(200).optional(),
-      })
+      .object({ name: z.string().trim().min(1).max(80) })
       .safeParse(req.body ?? {});
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
@@ -122,20 +72,11 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     const userId = req.currentUser!.sub;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return reply.code(401).send({ error: 'user_missing' });
-    const data: { name?: string; passwordHash?: string } = {};
-    if (parsed.data.name) data.name = parsed.data.name;
-    if (parsed.data.newPassword) {
-      if (!parsed.data.currentPassword) {
-        return reply.code(400).send({ error: 'current_password_required' });
-      }
-      const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash);
-      if (!ok) return reply.code(401).send({ error: 'wrong_current_password' });
-      data.passwordHash = await hashPassword(parsed.data.newPassword);
-    }
-    if (Object.keys(data).length === 0) return reply.code(400).send({ error: 'no_changes' });
-    const updated = await prisma.user.update({ where: { id: userId }, data });
-    if (data.name) recordAudit({ action: 'user.name.change', userId, req });
-    if (data.passwordHash) recordAudit({ action: 'user.password.change', userId, req });
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { name: parsed.data.name },
+    });
+    recordAudit({ action: 'user.name.change', userId, req });
     return {
       user: {
         id: updated.id,
@@ -146,10 +87,11 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     };
   });
 
-  // DELETE /me — destroy the account and all owned content.
+  // DELETE /me — destroy the account and all owned content. Confirm-only;
+  // there is no password to re-prompt with.
   server.delete('/me', { preHandler: server.requireAuth }, async (req, reply) => {
     const parsed = z
-      .object({ confirm: z.literal('DELETE'), password: z.string().min(1).max(200) })
+      .object({ confirm: z.literal('DELETE') })
       .safeParse(req.body ?? {});
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
@@ -157,8 +99,6 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     const userId = req.currentUser!.sub;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return reply.code(401).send({ error: 'user_missing' });
-    const ok = await verifyPassword(parsed.data.password, user.passwordHash);
-    if (!ok) return reply.code(401).send({ error: 'wrong_password' });
     await prisma.user.delete({ where: { id: userId } });
     recordAudit({ action: 'user.delete', userId, req, meta: { email: user.email } });
     clearToken(reply);

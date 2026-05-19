@@ -35,46 +35,6 @@ describe('auth rate limits', () => {
     expect(blocked).toBeGreaterThanOrEqual(2);
   });
 
-  it('/login allows 10/minute from a single IP, blocks the 11th', async () => {
-    const ip = '203.0.113.43';
-    let attempts = 0;
-    let blocked = 0;
-    for (let i = 0; i < 12; i++) {
-      const res = await server.inject({
-        method: 'POST',
-        url: '/api/auth/login',
-        payload: { email: 'nobody@example.com', password: 'whatever-long-enough' },
-        headers: { 'x-forwarded-for': ip },
-      });
-      if (res.statusCode === 429) blocked++;
-      else attempts++;
-    }
-    expect(attempts).toBe(10);
-    expect(blocked).toBeGreaterThanOrEqual(2);
-  });
-
-  it('/register allows 5/minute from a single IP, blocks the 6th', async () => {
-    const ip = '203.0.113.44';
-    let ok = 0;
-    let blocked = 0;
-    for (let i = 0; i < 7; i++) {
-      const res = await server.inject({
-        method: 'POST',
-        url: '/api/auth/register',
-        payload: {
-          email: `u${i}-${Date.now()}@example.com`,
-          name: `u${i}`,
-          password: 'correct-horse-battery-staple',
-        },
-        headers: { 'x-forwarded-for': ip },
-      });
-      if (res.statusCode === 201) ok++;
-      else if (res.statusCode === 429) blocked++;
-    }
-    expect(ok).toBe(5);
-    expect(blocked).toBeGreaterThanOrEqual(2);
-  });
-
   it('different IPs have independent counters', async () => {
     const ipA = '203.0.113.50';
     const ipB = '203.0.113.51';

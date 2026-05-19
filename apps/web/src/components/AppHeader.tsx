@@ -96,14 +96,9 @@ export function AppHeader() {
               )}
             </div>
           ) : (
-            <>
-              <Link to="/login" className="btn-ghost">
-                Log in
-              </Link>
-              <Link to="/register" className="btn-primary">
-                Sign up
-              </Link>
-            </>
+            <Link to="/" className="btn-primary">
+              Start coding
+            </Link>
           )}
         </nav>
       </div>

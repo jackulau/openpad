@@ -5,8 +5,6 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { CommandPalette } from './components/CommandPalette';
 import { useAuth } from './lib/authStore';
 
-const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
-const Register = lazy(() => import('./pages/Register').then((m) => ({ default: m.Register })));
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Pad = lazy(() => import('./pages/Pad').then((m) => ({ default: m.Pad })));
 const Playback = lazy(() => import('./pages/Playback').then((m) => ({ default: m.Playback })));
@@ -25,8 +23,9 @@ export function App() {
       <CommandPalette />
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        {/* Legacy auth routes redirect to landing — only /guest auth exists now. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/register" element={<Navigate to="/" replace />} />
         <Route
           path="/dashboard"
           element={

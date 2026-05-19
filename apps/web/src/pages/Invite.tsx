@@ -24,7 +24,7 @@ export function InvitePage() {
 
   const accept = async () => {
     if (!user) {
-      navigate(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
+      navigate(`/?next=${encodeURIComponent(`/invite/${token}`)}`);
       return;
     }
     setBusy(true);

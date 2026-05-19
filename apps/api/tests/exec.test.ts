@@ -21,8 +21,8 @@ beforeEach(async () => {
   await truncateAll(prisma);
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: 'exec@b.com', name: 'E', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: 'exec@b.com', name: 'E'},
   });
   token = r.json().token;
   const p = await server.inject({

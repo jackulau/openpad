@@ -27,8 +27,8 @@ beforeEach(async () => {
 async function makePadWithToken(): Promise<{ slug: string; token: string }> {
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: `stream-${Date.now()}@example.com`, name: 'S', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: `stream-${Date.now()}@example.com`, name: 'S'},
   });
   const token = r.json().token as string;
   const p = await server.inject({

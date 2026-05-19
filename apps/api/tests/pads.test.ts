@@ -10,8 +10,8 @@ let otherToken: string;
 async function reg(server: AppServer, email: string): Promise<string> {
   const res = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email, name: email.split('@')[0], password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email, name: email.split('@')[0]},
   });
   return res.json().token as string;
 }

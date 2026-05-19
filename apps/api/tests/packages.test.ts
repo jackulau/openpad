@@ -12,8 +12,8 @@ const auth = (t: string) => ({ authorization: `Bearer ${t}` });
 async function reg(email: string): Promise<string> {
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email, name: email.split('@')[0], password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email, name: email.split('@')[0]},
   });
   return r.json().token as string;
 }

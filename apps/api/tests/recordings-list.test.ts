@@ -11,8 +11,8 @@ let padId: string;
 async function register(): Promise<string> {
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: `recs-${Date.now()}@example.com`, name: 'X', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: `recs-${Date.now()}@example.com`, name: 'X'},
   });
   return r.json().token;
 }

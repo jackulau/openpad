@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/authStore';
 import { HttpError } from '../lib/api';
 import { Logo } from '../components/Logo';
@@ -76,16 +76,6 @@ export function Landing() {
           </button>
         </form>
 
-        <div className="text-xs text-subtle pt-4 flex items-center justify-center gap-3">
-          <span>Want a recoverable account?</span>
-          <Link to="/register" className="underline hover:text-secondary">
-            Sign up with email
-          </Link>
-          <span aria-hidden="true">·</span>
-          <Link to="/login" className="underline hover:text-secondary">
-            Log in
-          </Link>
-        </div>
       </div>
     </main>
   );

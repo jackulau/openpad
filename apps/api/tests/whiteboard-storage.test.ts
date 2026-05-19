@@ -18,8 +18,8 @@ beforeEach(async () => {
   await truncateAll(prisma);
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: `wb-${Date.now()}@example.com`, name: 'X', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: `wb-${Date.now()}@example.com`, name: 'X'},
   });
   token = r.json().token;
   const p = await server.inject({
@@ -78,8 +78,8 @@ describe('whiteboard storage', () => {
   it('non-viewers cannot access the whiteboard', async () => {
     const otherR = await server.inject({
       method: 'POST',
-      url: '/api/auth/register',
-      payload: { email: `wb-o-${Date.now()}@example.com`, name: 'O', password: 'password1234' },
+      url: '/api/auth/guest',
+      payload: { email: `wb-o-${Date.now()}@example.com`, name: 'O'},
     });
     const otherToken = otherR.json().token;
     const res = await server.inject({

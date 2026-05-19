@@ -17,11 +17,11 @@ beforeEach(async () => {
   await prisma.auditLog.deleteMany();
 });
 
-async function register(email: string): Promise<{ token: string; id: string }> {
+async function guest(email: string): Promise<{ token: string; id: string }> {
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email, name: 'X', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email, name: 'X' },
   });
   return { token: r.json().token, id: r.json().user.id };
 }
@@ -32,35 +32,8 @@ async function settle(): Promise<void> {
 }
 
 describe('audit log', () => {
-  it('records failed login attempts', async () => {
-    await register('audit-a@example.com');
-    await server.inject({
-      method: 'POST',
-      url: '/api/auth/login',
-      payload: { email: 'audit-a@example.com', password: 'wrong-password' },
-    });
-    await settle();
-    const rows = await prisma.auditLog.findMany({ where: { action: 'login.fail' } });
-    expect(rows.length).toBe(1);
-    expect(rows[0].target).toBe('audit-a@example.com');
-  });
-
-  it('records password change', async () => {
-    const { token, id } = await register('audit-b@example.com');
-    await server.inject({
-      method: 'PATCH',
-      url: '/api/auth/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { currentPassword: 'password1234', newPassword: 'new-password-9999' },
-    });
-    await settle();
-    const rows = await prisma.auditLog.findMany({ where: { action: 'user.password.change' } });
-    expect(rows.length).toBe(1);
-    expect(rows[0].userId).toBe(id);
-  });
-
   it('records pad deletion', async () => {
-    const { token, id } = await register('audit-c@example.com');
+    const { token, id } = await guest('audit-c@example.com');
     const p = await server.inject({
       method: 'POST',
       url: '/api/pads',
@@ -80,13 +53,13 @@ describe('audit log', () => {
     expect(rows[0].target).toBe(slug);
   });
 
-  it('records account deletion with email metadata', async () => {
-    const { token, id } = await register('audit-d@example.com');
+  it('records account deletion', async () => {
+    const { token, id } = await guest('audit-d@example.com');
     await server.inject({
       method: 'DELETE',
       url: '/api/auth/me',
       headers: { authorization: `Bearer ${token}` },
-      payload: { confirm: 'DELETE', password: 'password1234' },
+      payload: { confirm: 'DELETE' },
     });
     await settle();
     const rows = await prisma.auditLog.findMany({ where: { action: 'user.delete' } });
@@ -96,7 +69,7 @@ describe('audit log', () => {
   });
 
   it('records pad password set + clear separately', async () => {
-    const { token } = await register('audit-e@example.com');
+    const { token } = await guest('audit-e@example.com');
     const p = await server.inject({
       method: 'POST',
       url: '/api/pads',

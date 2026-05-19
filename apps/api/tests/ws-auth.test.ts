@@ -10,8 +10,8 @@ let baseUrl: string;
 async function token(): Promise<string> {
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: `ws-${Date.now()}@example.com`, name: 'X', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: `ws-${Date.now()}@example.com`, name: 'X'},
   });
   return r.json().token as string;
 }

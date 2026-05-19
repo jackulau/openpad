@@ -29,8 +29,8 @@ beforeEach(async () => {
   await prisma.recording.deleteMany();
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: `rec-${Date.now()}@example.com`, name: 'Rec', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: `rec-${Date.now()}@example.com`, name: 'Rec'},
   });
   token = r.json().token;
   userId = r.json().user.id;

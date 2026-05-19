@@ -23,8 +23,8 @@ beforeEach(async () => {
   _resetMetricsForTest();
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: 'metrics@b.com', name: 'M', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: 'metrics@b.com', name: 'M'},
   });
   token = r.json().token;
   const p = await server.inject({
@@ -36,8 +36,8 @@ beforeEach(async () => {
   slug = p.json().pad.slug;
   const o = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: 'other@b.com', name: 'O', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: 'other@b.com', name: 'O'},
   });
   otherToken = o.json().token;
 });

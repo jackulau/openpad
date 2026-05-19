@@ -23,8 +23,8 @@ beforeEach(async () => {
   await truncateAll(prisma);
   const r = await server.inject({
     method: 'POST',
-    url: '/api/auth/register',
-    payload: { email: 'play@b.com', name: 'P', password: 'password1234' },
+    url: '/api/auth/guest',
+    payload: { email: 'play@b.com', name: 'P'},
   });
   token = r.json().token;
   const p = await server.inject({
@@ -98,8 +98,8 @@ describe('playback', () => {
   it('rejects non-members', async () => {
     const r = await server.inject({
       method: 'POST',
-      url: '/api/auth/register',
-      payload: { email: 'x@b.com', name: 'X', password: 'password1234' },
+      url: '/api/auth/guest',
+      payload: { email: 'x@b.com', name: 'X'},
     });
     const res = await server.inject({
       method: 'GET',
