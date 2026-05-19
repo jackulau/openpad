@@ -30,6 +30,9 @@ const schema = z.object({
   // Comma-separated lang IDs to keep warm. Default covers the hot path
   // (Python/JavaScript/Go interpreted langs where cold-start dominates).
   EXEC_POOL_LANGS: z.string().default('python312,node20,go122'),
+  // Max size of the per-process compile-artifact cache (in MB). 0 disables.
+  // LRU-evicted; survives process lifetime only (no persistence across restart).
+  EXEC_COMPILE_CACHE_MAX_MB: z.coerce.number().int().min(0).default(512),
   TERMINAL_IDLE_MS: z.coerce.number().default(10 * 60_000),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(120),
   ALLOWED_ORIGINS: z.string().optional(),
