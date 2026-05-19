@@ -9,8 +9,16 @@ import {
   screenToWorld,
   zoomAtPoint,
 } from '../lib/canvas-transform';
+import {
+  strokeBounds,
+  handlesFor,
+  hitHandle,
+  hitStrokeIdx as libHitStrokeIdx,
+  moveStroke as libMoveStroke,
+  resizeStroke as libResizeStroke,
+} from '../lib/canvas-hit';
 
-type Tool = 'pen' | 'rect' | 'ellipse' | 'arrow' | 'text' | 'erase';
+type Tool = 'select' | 'pen' | 'rect' | 'ellipse' | 'arrow' | 'text' | 'erase';
 
 type Stroke =
   | { id: string; kind: 'pen'; color: string; sw: number; points: Array<[number, number]> }
@@ -22,6 +30,7 @@ type Stroke =
 const COLORS = ['#f4f4f5', '#34d399', '#60a5fa', '#fbbf24', '#f87171', '#a78bfa', '#fb7185'];
 
 const TOOLS: Array<{ id: Tool; label: string; hint: string; key: string; icon: React.ReactNode; cursor: string }> = [
+  { id: 'select', label: 'Select', hint: 'Click to select, drag to move', key: 'V', icon: <SelectIcon />, cursor: 'default' },
   { id: 'pen', label: 'Pen', hint: 'Freehand draw', key: 'P', icon: <PenIcon />, cursor: 'crosshair' },
   { id: 'rect', label: 'Rectangle', hint: 'Draw box', key: 'R', icon: <RectIcon />, cursor: 'crosshair' },
   { id: 'ellipse', label: 'Ellipse', hint: 'Draw oval', key: 'E', icon: <EllipseIcon />, cursor: 'crosshair' },
@@ -58,6 +67,12 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const [spacePressed, setSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const dragRef = useRef<
+    | null
+    | { kind: 'move'; startX: number; startY: number; baseStroke: Stroke }
+    | { kind: 'resize'; handle: import('../lib/canvas-hit').HandleName; baseStroke: Stroke }
+  >(null);
 
   const yArrayRef = useRef<Y.Array<Stroke> | null>(null);
   const undoMgrRef = useRef<Y.UndoManager | null>(null);
@@ -139,6 +154,35 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       }
       if (e.key === 'Escape') {
         setDraft(null);
+        setSelectedId(null);
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        const arr = yArrayRef.current;
+        if (!arr) return;
+        const idx = arr.toArray().findIndex((s) => s.id === selectedId);
+        if (idx >= 0) {
+          e.preventDefault();
+          arr.delete(idx, 1);
+          setSelectedId(null);
+        }
+        return;
+      }
+      if (selectedId && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        const arr = yArrayRef.current;
+        if (!arr) return;
+        const idx = arr.toArray().findIndex((s) => s.id === selectedId);
+        if (idx < 0) return;
+        const current = arr.get(idx);
+        const next = libMoveStroke(current, dx, dy) as Stroke;
+        arr.doc?.transact(() => {
+          arr.delete(idx, 1);
+          arr.insert(idx, [next]);
+        });
         return;
       }
       if (e.key === ' ') {
@@ -184,7 +228,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [active]);
+  }, [active, selectedId]);
 
   const zoomBy = useCallback((factor: number) => {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -237,6 +281,29 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
     if (e.button !== 0) return;
     const [x, y] = pos(e);
     try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* lost pointer */ }
+    if (tool === 'select') {
+      // Priority: handle hit on the currently-selected stroke → resize.
+      // Else body hit on any stroke → move that stroke. Else deselect.
+      if (selectedId) {
+        const sel = strokes.find((s) => s.id === selectedId);
+        if (sel) {
+          const handle = hitHandle(sel, x, y, 8 / Math.max(0.5, viewportRef.current.zoom));
+          if (handle) {
+            dragRef.current = { kind: 'resize', handle, baseStroke: sel };
+            return;
+          }
+        }
+      }
+      const idx = libHitStrokeIdx(strokes, x, y);
+      if (idx >= 0) {
+        const hit = strokes[idx];
+        setSelectedId(hit.id);
+        dragRef.current = { kind: 'move', startX: x, startY: y, baseStroke: hit };
+      } else {
+        setSelectedId(null);
+      }
+      return;
+    }
     if (tool === 'pen') {
       setDraft({ id: rid(), kind: 'pen', color, sw: strokeWidth, points: [[x, y]] });
     } else if (tool === 'rect') {
@@ -265,6 +332,29 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       setViewport((vp) => ({ ...vp, x: vp.x - dx, y: vp.y - dy }));
       return;
     }
+    // Select-tool drag: live-update the selected stroke in Yjs (one tx per
+    // pointer move; UndoManager bundles via captureTimeout=250).
+    if (tool === 'select' && dragRef.current) {
+      const drag = dragRef.current;
+      const [x, y] = pos(e);
+      const arr = yArrayRef.current;
+      if (!arr) return;
+      const idx = arr.toArray().findIndex((s) => s.id === drag.baseStroke.id);
+      if (idx < 0) return;
+      let next: Stroke;
+      if (drag.kind === 'move') {
+        const dx = x - drag.startX;
+        const dy = y - drag.startY;
+        next = libMoveStroke(drag.baseStroke, dx, dy) as Stroke;
+      } else {
+        next = libResizeStroke(drag.baseStroke, drag.handle, x, y) as Stroke;
+      }
+      arr.doc?.transact(() => {
+        arr.delete(idx, 1);
+        arr.insert(idx, [next]);
+      });
+      return;
+    }
     if (!draft) return;
     const [x, y] = pos(e);
     if (draft.kind === 'pen') {
@@ -286,6 +376,10 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       }
       panRef.current = { active: false, lastX: 0, lastY: 0, pointerId: null };
       setIsPanning(false);
+      return;
+    }
+    if (dragRef.current) {
+      dragRef.current = null;
       return;
     }
     if (draft) commitDraft();
@@ -402,6 +496,39 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
                 <StrokeShape key={s.id} stroke={s} />
               ))}
               {draft && <StrokeShape stroke={draft} />}
+              {selectedId && tool === 'select' && (() => {
+                const sel = strokes.find((s) => s.id === selectedId);
+                if (!sel) return null;
+                const b = strokeBounds(sel);
+                const handles = handlesFor(sel);
+                const handleSize = Math.max(6, 8 / Math.max(0.5, viewport.zoom));
+                return (
+                  <g pointerEvents="none">
+                    <rect
+                      x={b.minX}
+                      y={b.minY}
+                      width={b.maxX - b.minX}
+                      height={b.maxY - b.minY}
+                      fill="none"
+                      stroke="#60a5fa"
+                      strokeWidth={1.5 / Math.max(0.5, viewport.zoom)}
+                      strokeDasharray={`${4 / Math.max(0.5, viewport.zoom)} ${3 / Math.max(0.5, viewport.zoom)}`}
+                    />
+                    {handles.map((h) => (
+                      <rect
+                        key={h.name}
+                        x={h.x - handleSize / 2}
+                        y={h.y - handleSize / 2}
+                        width={handleSize}
+                        height={handleSize}
+                        fill="#60a5fa"
+                        stroke="#ffffff"
+                        strokeWidth={1 / Math.max(0.5, viewport.zoom)}
+                      />
+                    ))}
+                  </g>
+                );
+              })()}
             </g>
           </svg>
         )}
@@ -646,6 +773,14 @@ function ZoomControls({
 }
 
 // Icons — kept inline so the bundle doesn't grow for one component.
+function SelectIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3l7 18 2-8 8-2z" />
+    </svg>
+  );
+}
+
 function PenIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
