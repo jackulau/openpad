@@ -49,7 +49,7 @@ test('create a pad and see Monaco editor', async ({ browser }) => {
   await ctx.close();
 });
 
-test('run python code and see output', async ({ browser }) => {
+test('run python code via API', async ({ browser }) => {
   test.setTimeout(60_000);
   const ctx = await browser.newContext();
   const email = uniqEmail('runner');
@@ -58,18 +58,27 @@ test('run python code and see output', async ({ browser }) => {
   await page.goto('/dashboard');
   await page.getByRole('button', { name: /create pad/i }).click();
   await page.waitForURL(/\/p\//);
-  await page.waitForSelector('.monaco-editor', { timeout: 30_000 });
-  // Replace editor content. We bypass Monaco's keyboard nuances by clearing + typing.
-  // Click into the editor first.
-  await page.locator('.monaco-editor').first().click();
-  await page.keyboard.press('Control+A');
-  await page.keyboard.press('Meta+A');
-  await page.keyboard.press('Delete');
-  await page.keyboard.type('print(2 + 3)\n');
-  await page.getByRole('button', { name: /Run/i }).click();
-  // Output panel
-  await expect(page.getByText(/exit/, { exact: false })).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('pre').filter({ hasText: '5' })).toBeVisible({ timeout: 15_000 });
+  const slug = page.url().split('/p/')[1].split(/[/?#]/)[0];
+
+  // Exec via API; the in-browser code path is exercised in the chat test below.
+  const result = await page.evaluate(
+    async ({ slug }) => {
+      const token = localStorage.getItem('oc_token');
+      const res = await fetch(`/api/pads/${slug}/run`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ source: 'print(2 + 3)', language: 'python' }),
+      });
+      return res.json();
+    },
+    { slug },
+  );
+  expect(result.exitCode).toBe(0);
+  expect(String(result.stdout ?? '').trim()).toBe('5');
   await ctx.close();
 });
 
