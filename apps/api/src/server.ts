@@ -11,6 +11,10 @@ import { registerPadRoutes } from './routes/pads.js';
 import { registerExecRoutes } from './routes/exec.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerFileRoutes } from './routes/files.js';
+import {
+  registerInviteAcceptRoutes,
+  registerInviteRoutes,
+} from './routes/invites.js';
 import { registerWebSocket } from './ws/index.js';
 
 export type AppServer = FastifyInstance;
@@ -56,6 +60,8 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerExecRoutes, { prefix: '/api/pads' });
   await server.register(registerFileRoutes, { prefix: '/api/pads' });
   await server.register(registerChatRoutes, { prefix: '/api/pads' });
+  await server.register(registerInviteRoutes, { prefix: '/api/pads' });
+  await server.register(registerInviteAcceptRoutes, { prefix: '/api/invites' });
   await registerWebSocket(server);
 
   return server;
