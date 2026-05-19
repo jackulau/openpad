@@ -20,8 +20,9 @@ services:
       NODE_ENV: production
       PORT: "4000"
       HOST: "0.0.0.0"
-      # Set a strong value in .env; this default is ONLY for `docker compose config` validation.
-      JWT_SECRET: "${JWT_SECRET:-please-override-me-in-dot-env-file-32chars}"
+      # Required. Refuses to start if unset / empty. Generate with:
+      #   openssl rand -hex 32
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env — generate with: openssl rand -hex 32}"
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:4000}"
       DATABASE_URL: "${DATABASE_URL:-file:/data/opencoder.db}"
       DATA_DIR: "/data"
@@ -36,6 +37,12 @@ services:
       # Mount the host docker socket so the api can spawn sandboxed
       # language containers. Comment this out to force-local exec.
       - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
 
 volumes:
   opencoder_data:

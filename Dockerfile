@@ -22,8 +22,10 @@ RUN pnpm --filter @opencoder/api build
 
 FROM node:20-bookworm-slim AS runner
 ENV NODE_ENV=production
+# wget is used by HEALTHCHECK; docker-cli lets the api spawn sandboxed code
+# runners on the host daemon (mounted via /var/run/docker.sock).
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates docker-cli \
+      ca-certificates docker-cli wget \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/opencoder
 COPY --from=builder /opt/opencoder/node_modules ./node_modules
@@ -39,5 +41,7 @@ ENV HOST=0.0.0.0
 ENV DATABASE_URL="file:/data/opencoder.db"
 EXPOSE 4000
 VOLUME ["/data"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=5 \
+  CMD wget -qO- http://localhost:4000/health || exit 1
 WORKDIR /opt/opencoder/apps/api
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
