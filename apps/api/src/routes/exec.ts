@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { canEdit, getPadAccess } from '../lib/permissions.js';
 import { resolveLanguage } from '@opencoder/shared';
 import { runCode } from '../exec/runner.js';
+import { incCounter, releaseRun, tryReserveRun } from '../exec/metrics.js';
 import { prisma } from '../db.js';
 
 const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
@@ -27,14 +28,26 @@ export async function registerExecRoutes(server: FastifyInstance): Promise<void>
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
     }
+    if (!tryReserveRun(access.pad.id)) {
+      return reply.code(429).send({ error: 'too_many_runs' });
+    }
+    incCounter('totalRuns');
     const language = parsed.data.language ?? access.pad.language;
-    const result = await runCode({
-      language,
-      source: parsed.data.source,
-      stdin: parsed.data.stdin,
-      filename: parsed.data.filename,
-      timeoutMs: parsed.data.timeoutMs,
-    });
+    let result;
+    try {
+      result = await runCode({
+        language,
+        source: parsed.data.source,
+        stdin: parsed.data.stdin,
+        filename: parsed.data.filename,
+        timeoutMs: parsed.data.timeoutMs,
+      });
+      if (result.exitCode !== 0 || result.timedOut) incCounter('totalErrors');
+      if (result.runner === 'docker-pool') incCounter('poolHits');
+      else if (result.runner === 'docker') incCounter('poolMisses');
+    } finally {
+      releaseRun(access.pad.id);
+    }
 
     // Record run event for playback. We persist truncated stdout/stderr so
     // recording playback can replay the actual output, not just the metadata.

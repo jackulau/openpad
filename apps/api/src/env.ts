@@ -33,6 +33,10 @@ const schema = z.object({
   // Max size of the per-process compile-artifact cache (in MB). 0 disables.
   // LRU-evicted; survives process lifetime only (no persistence across restart).
   EXEC_COMPILE_CACHE_MAX_MB: z.coerce.number().int().min(0).default(512),
+  // Max concurrent /run + /run-stream invocations per pad. The 6th from the
+  // same pad gets HTTP 429 until one finishes. Prevents one user from monopolizing
+  // the warm pool while siblings starve.
+  EXEC_PER_PAD_CONCURRENCY: z.coerce.number().int().min(1).default(5),
   TERMINAL_IDLE_MS: z.coerce.number().default(10 * 60_000),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(120),
   ALLOWED_ORIGINS: z.string().optional(),
