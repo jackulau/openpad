@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/authStore';
 import { HttpError } from '../lib/api';
+import { Logo } from '../components/Logo';
 
 export function Landing() {
   const navigate = useNavigate();
@@ -21,22 +22,37 @@ export function Landing() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6">
-      <div className="max-w-xl text-center space-y-6 w-full">
+    <main className="landing-bg relative min-h-screen flex items-center justify-center px-6">
+      <div className="relative max-w-xl text-center space-y-6 w-full">
+        <div className="flex justify-center pb-2">
+          <Logo size={56} withText={false} />
+        </div>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-line text-xs text-secondary">
-          <span className="size-1.5 rounded-full bg-accent animate-pulse" />
+          <span
+            className="size-1.5 rounded-full bg-accent animate-pulse"
+            aria-hidden="true"
+          />
           self-hosted · open source
         </div>
-        <h1 className="text-5xl font-semibold tracking-tight">
-          Code together, <span className="text-accent">on your own port</span>.
+        <h1 className="text-5xl font-semibold tracking-tight leading-[1.05]">
+          Code together,{' '}
+          <span className="text-accent">on your own port</span>.
         </h1>
-        <p className="text-secondary leading-relaxed">
-          Pick a name and start coding. No email, no password. Share the URL with your
-          friends — they pick a name too and join you.
+        <p className="text-secondary leading-relaxed max-w-md mx-auto">
+          Pick a name and start coding. No email, no password. Share the URL
+          with your friends — they pick a name too and join you.
         </p>
 
-        <form onSubmit={onSubmit} className="space-y-3 max-w-sm mx-auto pt-2">
+        <form
+          onSubmit={onSubmit}
+          className="space-y-3 max-w-sm mx-auto pt-2"
+          aria-label="Guest signup"
+        >
+          <label htmlFor="guest-name" className="sr-only">
+            Your name
+          </label>
           <input
+            id="guest-name"
             autoFocus
             required
             minLength={1}
@@ -51,7 +67,11 @@ export function Landing() {
               {err}
             </div>
           )}
-          <button type="submit" className="btn-primary w-full !py-3" disabled={loading || !name.trim()}>
+          <button
+            type="submit"
+            className="btn-primary w-full !py-3"
+            disabled={loading || !name.trim()}
+          >
             {loading ? 'Starting…' : 'Start coding →'}
           </button>
         </form>
@@ -61,7 +81,7 @@ export function Landing() {
           <Link to="/register" className="underline hover:text-secondary">
             Sign up with email
           </Link>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <Link to="/login" className="underline hover:text-secondary">
             Log in
           </Link>

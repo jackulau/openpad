@@ -188,6 +188,55 @@
   }
 }
 
+/* Landing page background: subtle radial accent glow + faint dot grid so the
+ * minimal layout has texture without distracting from the form. Both layers
+ * are CSS-only (no images, no JS), and respect dark/light via design tokens. */
+.landing-bg {
+  position: relative;
+  isolation: isolate;
+  background-color: rgb(var(--oc-bg-page));
+}
+.landing-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(
+      900px circle at 50% 18%,
+      rgb(var(--oc-accent) / 0.18),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px circle at 80% 110%,
+      rgb(var(--oc-accent) / 0.08),
+      transparent 55%
+    );
+  pointer-events: none;
+}
+.landing-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(
+    rgb(var(--oc-text-muted) / 0.12) 1px,
+    transparent 1px
+  );
+  background-size: 22px 22px;
+  mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 40%,
+    black 40%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    ellipse 70% 60% at 50% 40%,
+    black 40%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
 /* Remote-collaborator cursor + selection decorations rendered inside Monaco.
  * Per-user color is injected via a <style> tag at runtime (see Editor.tsx);
  * these rules carry the structural styling that doesn't vary. */
