@@ -57,6 +57,10 @@ export interface PresenceUser {
     endLine: number;
     endColumn: number;
   };
+  // World-coordinate position of this user's pointer over the whiteboard
+  // canvas. Cleared when the pointer leaves the canvas. See WhiteboardCanvas
+  // for the throttled broadcast.
+  canvasCursor?: { x: number; y: number } | null;
 }
 
 export interface ChatMessage {

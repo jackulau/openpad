@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import { useQuery } from '@tanstack/react-query';
-import { CollabClient } from '../lib/collab';
+import { CollabClient, type PresenceUser } from '../lib/collab';
 import { api } from '../lib/api';
 import {
   type Viewport,
@@ -18,14 +18,15 @@ import {
   resizeStroke as libResizeStroke,
 } from '../lib/canvas-hit';
 
-type Tool = 'select' | 'pen' | 'rect' | 'ellipse' | 'arrow' | 'text' | 'erase';
+type Tool = 'select' | 'pen' | 'rect' | 'ellipse' | 'arrow' | 'text' | 'note' | 'erase';
 
 type Stroke =
   | { id: string; kind: 'pen'; color: string; sw: number; points: Array<[number, number]> }
   | { id: string; kind: 'rect'; color: string; sw: number; x: number; y: number; w: number; h: number }
   | { id: string; kind: 'ellipse'; color: string; sw: number; cx: number; cy: number; rx: number; ry: number }
   | { id: string; kind: 'arrow'; color: string; sw: number; x1: number; y1: number; x2: number; y2: number }
-  | { id: string; kind: 'text'; color: string; x: number; y: number; text: string };
+  | { id: string; kind: 'text'; color: string; x: number; y: number; text: string }
+  | { id: string; kind: 'note'; color: string; x: number; y: number; w: number; h: number; text: string };
 
 const COLORS = ['#f4f4f5', '#34d399', '#60a5fa', '#fbbf24', '#f87171', '#a78bfa', '#fb7185'];
 
@@ -36,6 +37,7 @@ const TOOLS: Array<{ id: Tool; label: string; hint: string; key: string; icon: R
   { id: 'ellipse', label: 'Ellipse', hint: 'Draw oval', key: 'E', icon: <EllipseIcon />, cursor: 'crosshair' },
   { id: 'arrow', label: 'Arrow', hint: 'Connect things', key: 'A', icon: <ArrowIcon />, cursor: 'crosshair' },
   { id: 'text', label: 'Text', hint: 'Add a label', key: 'T', icon: <TextIcon />, cursor: 'text' },
+  { id: 'note', label: 'Note', hint: 'Sticky note', key: 'N', icon: <NoteIcon />, cursor: 'crosshair' },
   { id: 'erase', label: 'Erase', hint: 'Click to remove', key: 'X', icon: <EraseIcon />, cursor: 'cell' },
 ];
 
@@ -69,6 +71,8 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
   const [isPanning, setIsPanning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [remoteCursors, setRemoteCursors] = useState<PresenceUser[]>([]);
+  const lastCanvasCursorSendRef = useRef(0);
   // Convenience: when exactly one is selected, treat as single-select for handles.
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0]! : null;
   const dragRef = useRef<
@@ -93,6 +97,31 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
   spacePressedRef.current = spacePressed;
 
   const currentTool = useMemo(() => TOOLS.find((t) => t.id === tool) ?? TOOLS[0], [tool]);
+
+  // Subscribe to peer presence — pick out users hovering the canvas. Each
+  // remote cursor renders as a small dot + name label at the broadcast world
+  // coord. Clears when they leave (canvasCursor === null) or disconnect.
+  useEffect(() => {
+    if (!active) return;
+    const unsub = client.onPresence((users) => {
+      const list = Object.values(users).filter((u) => u.canvasCursor != null);
+      setRemoteCursors(list);
+    });
+    return () => {
+      unsub();
+      setRemoteCursors([]);
+    };
+  }, [client, active]);
+
+  // Clear our cursor broadcast when we leave the canvas pane.
+  useEffect(() => {
+    if (!active) {
+      client.setSelfPresence({ canvasCursor: null });
+    }
+    return () => {
+      client.setSelfPresence({ canvasCursor: null });
+    };
+  }, [client, active]);
 
   useEffect(() => {
     if (!wb.data?.fileId) return;
@@ -123,6 +152,23 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
 
   const commitDraft = () => {
     if (!draft) return;
+    // Sticky notes prompt for text once their drag is done. Skip the commit if
+    // the user cancels the prompt or draws a tiny note (< 20×20).
+    if (draft.kind === 'note') {
+      const minW = 20;
+      const minH = 20;
+      // normalize drag so w/h positive
+      const nx = draft.w < 0 ? draft.x + draft.w : draft.x;
+      const ny = draft.h < 0 ? draft.y + draft.h : draft.y;
+      const nw = Math.max(minW, Math.abs(draft.w));
+      const nh = Math.max(minH, Math.abs(draft.h));
+      const text = prompt('Note text:');
+      if (text && text.trim()) {
+        yArrayRef.current?.push([{ ...draft, x: nx, y: ny, w: nw, h: nh, text: text.trim() }]);
+      }
+      setDraft(null);
+      return;
+    }
     yArrayRef.current?.push([draft]);
     setDraft(null);
   };
@@ -345,6 +391,8 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       setDraft({ id: rid(), kind: 'ellipse', color, sw: strokeWidth, cx: x, cy: y, rx: 0, ry: 0 });
     } else if (tool === 'arrow') {
       setDraft({ id: rid(), kind: 'arrow', color, sw: strokeWidth, x1: x, y1: y, x2: x, y2: y });
+    } else if (tool === 'note') {
+      setDraft({ id: rid(), kind: 'note', color, x, y, w: 0, h: 0, text: '' });
     } else if (tool === 'text') {
       const text = prompt('Label:');
       if (text && text.trim()) {
@@ -357,6 +405,15 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
   };
 
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    // Broadcast our canvas-cursor at ~50ms throttle so peers can see us
+    // hovering even when we're not drawing. canvasCursor in PresenceUser
+    // doubles as our liveness indicator on the whiteboard.
+    const now = Date.now();
+    if (now - lastCanvasCursorSendRef.current > 50) {
+      lastCanvasCursorSendRef.current = now;
+      const [wx, wy] = pos(e);
+      client.setSelfPresence({ canvasCursor: { x: wx, y: wy } });
+    }
     if (panRef.current.active) {
       const dx = e.clientX - panRef.current.lastX;
       const dy = e.clientY - panRef.current.lastY;
@@ -416,6 +473,8 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       setDraft({ ...draft, rx: Math.abs(x - draft.cx), ry: Math.abs(y - draft.cy) });
     } else if (draft.kind === 'arrow') {
       setDraft({ ...draft, x2: x, y2: y });
+    } else if (draft.kind === 'note') {
+      setDraft({ ...draft, w: x - draft.x, h: y - draft.y });
     }
   };
 
@@ -642,6 +701,40 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
                   </g>
                 );
               })()}
+              {remoteCursors.map((u) => {
+                if (!u.canvasCursor) return null;
+                return (
+                  <g key={u.userId} pointerEvents="none">
+                    <circle
+                      cx={u.canvasCursor.x}
+                      cy={u.canvasCursor.y}
+                      r={6 / Math.max(0.5, viewport.zoom)}
+                      fill={u.color}
+                      stroke="#ffffff"
+                      strokeWidth={1.5 / Math.max(0.5, viewport.zoom)}
+                    />
+                    <rect
+                      x={u.canvasCursor.x + 10 / Math.max(0.5, viewport.zoom)}
+                      y={u.canvasCursor.y - 8 / Math.max(0.5, viewport.zoom)}
+                      width={u.name.length * 7 / Math.max(0.5, viewport.zoom) + 8 / Math.max(0.5, viewport.zoom)}
+                      height={16 / Math.max(0.5, viewport.zoom)}
+                      rx={3 / Math.max(0.5, viewport.zoom)}
+                      fill={u.color}
+                      opacity={0.92}
+                    />
+                    <text
+                      x={u.canvasCursor.x + 14 / Math.max(0.5, viewport.zoom)}
+                      y={u.canvasCursor.y + 3 / Math.max(0.5, viewport.zoom)}
+                      fill="#ffffff"
+                      fontFamily="ui-sans-serif, system-ui, sans-serif"
+                      fontSize={11 / Math.max(0.5, viewport.zoom)}
+                      fontWeight={600}
+                    >
+                      {u.name}
+                    </text>
+                  </g>
+                );
+              })}
               {marquee && tool === 'select' && (
                 <rect
                   pointerEvents="none"
@@ -756,7 +849,64 @@ function StrokeShape({ stroke: s }: { stroke: Stroke }) {
           {s.text}
         </text>
       );
+    case 'note': {
+      const x = Math.min(s.x, s.x + s.w);
+      const y = Math.min(s.y, s.y + s.h);
+      const w = Math.abs(s.w);
+      const h = Math.abs(s.h);
+      const pad = 8;
+      const lines = wrapNoteText(s.text, w - pad * 2, 14);
+      return (
+        <g>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            fill={s.color}
+            fillOpacity={0.18}
+            stroke={s.color}
+            strokeWidth={1.5}
+            rx={6}
+          />
+          {lines.map((line, i) => (
+            <text
+              key={i}
+              x={x + pad}
+              y={y + pad + 14 + i * 16}
+              fill={s.color}
+              fontFamily="ui-sans-serif, system-ui, sans-serif"
+              fontSize={13}
+              style={{ pointerEvents: 'none' }}
+            >
+              {line}
+            </text>
+          ))}
+        </g>
+      );
+    }
   }
+}
+
+// Crude word-wrap for sticky-note text. Pure char-width estimate; close enough
+// for short notes. Strips overflow lines so tall notes don't bleed past bbox.
+function wrapNoteText(text: string, maxWidth: number, charPx: number): string[] {
+  if (!text) return [];
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = '';
+  const maxChars = Math.max(1, Math.floor(maxWidth / Math.max(1, charPx * 0.55)));
+  for (const w of words) {
+    const test = current ? current + ' ' + w : w;
+    if (test.length > maxChars) {
+      if (current) lines.push(current);
+      current = w;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
 }
 
 function hitTest(strokes: Stroke[], x: number, y: number): number {
@@ -782,6 +932,12 @@ function hitTest(strokes: Stroke[], x: number, y: number): number {
     } else if (s.kind === 'text') {
       const w = s.text.length * 9;
       if (x >= s.x - 4 && x <= s.x + w && y >= s.y - 18 && y <= s.y + 4) return i;
+    } else if (s.kind === 'note') {
+      const minX = Math.min(s.x, s.x + s.w);
+      const minY = Math.min(s.y, s.y + s.h);
+      const maxX = Math.max(s.x, s.x + s.w);
+      const maxY = Math.max(s.y, s.y + s.h);
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) return i;
     }
   }
   return -1;
@@ -832,6 +988,9 @@ function computeStrokeBounds(
     } else if (s.kind === 'text') {
       grow(s.x, s.y - 18);
       grow(s.x + s.text.length * 9, s.y + 4);
+    } else if (s.kind === 'note') {
+      grow(Math.min(s.x, s.x + s.w), Math.min(s.y, s.y + s.h));
+      grow(Math.max(s.x, s.x + s.w), Math.max(s.y, s.y + s.h));
     }
   }
   if (!Number.isFinite(minX)) return null;
@@ -899,6 +1058,17 @@ function ZoomControls({
 }
 
 // Icons — kept inline so the bundle doesn't grow for one component.
+function NoteIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <line x1="8" y1="8" x2="16" y2="8" />
+      <line x1="8" y1="12" x2="14" y2="12" />
+      <line x1="8" y1="16" x2="12" y2="16" />
+    </svg>
+  );
+}
+
 function SelectIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -7,7 +7,8 @@ export type Stroke =
   | { id: string; kind: 'rect'; color: string; sw: number; x: number; y: number; w: number; h: number }
   | { id: string; kind: 'ellipse'; color: string; sw: number; cx: number; cy: number; rx: number; ry: number }
   | { id: string; kind: 'arrow'; color: string; sw: number; x1: number; y1: number; x2: number; y2: number }
-  | { id: string; kind: 'text'; color: string; x: number; y: number; text: string };
+  | { id: string; kind: 'text'; color: string; x: number; y: number; text: string }
+  | { id: string; kind: 'note'; color: string; x: number; y: number; w: number; h: number; text: string };
 
 export interface Bounds {
   minX: number;
@@ -71,6 +72,14 @@ export function strokeBounds(s: Stroke): Bounds {
       minY: Math.min(s.y1, s.y2),
       maxX: Math.max(s.x1, s.x2),
       maxY: Math.max(s.y1, s.y2),
+    };
+  }
+  if (s.kind === 'note') {
+    return {
+      minX: Math.min(s.x, s.x + s.w),
+      minY: Math.min(s.y, s.y + s.h),
+      maxX: Math.max(s.x, s.x + s.w),
+      maxY: Math.max(s.y, s.y + s.h),
     };
   }
   // text: width ~ length * 9, height ~ 18 — coarse but good enough for select
@@ -146,7 +155,7 @@ export function hitStrokeIdx(strokes: Stroke[], x: number, y: number): number {
       if (dx * dx + dy * dy <= 1.2) return i;
     } else if (s.kind === 'arrow') {
       if (distToSegment(x, y, s.x1, s.y1, s.x2, s.y2) < pad) return i;
-    } else if (s.kind === 'text') {
+    } else if (s.kind === 'text' || s.kind === 'note') {
       const b = strokeBounds(s);
       if (x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY) return i;
     }
@@ -178,6 +187,7 @@ export function moveStroke(s: Stroke, dx: number, dy: number): Stroke {
   if (s.kind === 'rect') return { ...s, x: s.x + dx, y: s.y + dy };
   if (s.kind === 'ellipse') return { ...s, cx: s.cx + dx, cy: s.cy + dy };
   if (s.kind === 'arrow') return { ...s, x1: s.x1 + dx, y1: s.y1 + dy, x2: s.x2 + dx, y2: s.y2 + dy };
+  if (s.kind === 'note') return { ...s, x: s.x + dx, y: s.y + dy };
   return { ...s, x: s.x + dx, y: s.y + dy };
 }
 
@@ -225,6 +235,9 @@ export function resizeStroke(s: Stroke, handle: HandleName, nx: number, ny: numb
         minY + ((y - b.minY) / oldH) * newH,
       ] as [number, number]),
     };
+  }
+  if (s.kind === 'note') {
+    return { ...s, x: minX, y: minY, w: maxX - minX, h: maxY - minY };
   }
   // text: leave size unchanged on resize; just move origin
   return { ...s, x: minX, y: maxY };
