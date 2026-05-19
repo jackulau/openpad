@@ -23,6 +23,13 @@ const schema = z.object({
   // the slow first-run image pull. Set false in CI / local dev where images are
   // already cached or where pulls would be wasted.
   EXEC_PREPULL: z.coerce.boolean().default(true),
+  // Number of warm docker containers kept ready per language in EXEC_POOL_LANGS.
+  // 0 disables the pool entirely (forces cold `docker run --rm` per /run, prior
+  // behavior). Each warm slot consumes EXEC_MEMORY_MB of RAM while idle.
+  EXEC_POOL_SIZE: z.coerce.number().int().min(0).default(2),
+  // Comma-separated lang IDs to keep warm. Default covers the hot path
+  // (Python/JavaScript/Go interpreted langs where cold-start dominates).
+  EXEC_POOL_LANGS: z.string().default('python312,node20,go122'),
   TERMINAL_IDLE_MS: z.coerce.number().default(10 * 60_000),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(120),
   ALLOWED_ORIGINS: z.string().optional(),

@@ -54,7 +54,7 @@ export interface RunResult {
   exitCode: number | null;
   timedOut: boolean;
   durationMs: number;
-  runner: 'docker' | 'subprocess' | 'disabled';
+  runner: 'docker' | 'docker-pool' | 'subprocess' | 'disabled';
   language: string;
 }
 

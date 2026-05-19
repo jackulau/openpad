@@ -1,6 +1,7 @@
 import { env, validateEnv } from './env.js';
 import { buildServer } from './server.js';
 import { prepullImages } from './exec/prepull.js';
+import { getPool } from './exec/pool.js';
 
 const start = async () => {
   const { errors, warnings } = validateEnv(env);
@@ -23,7 +24,36 @@ const start = async () => {
     // don't crash the server (cold pull still happens on demand).
     void prepullImages({
       log: (m: string) => server.log.info({ scope: 'exec/prepull' }, m),
-    }).catch((err) => server.log.warn({ err }, 'prepull failed'));
+    })
+      .then(() => {
+        // Start the warm container pool only after images are present.
+        // Pool.start() runs `docker run -d`, which would itself pull the image
+        // if missing — but pre-pull deduplicates network fetch + makes the
+        // first acquire faster.
+        const pool = getPool();
+        return pool
+          .start()
+          .catch((err: unknown) => server.log.warn({ err }, 'pool start failed'));
+      })
+      .catch((err) => server.log.warn({ err }, 'prepull failed'));
+
+    // Tear down pooled containers on graceful shutdown so we don't leak them.
+    const shutdown = async (signal: string) => {
+      server.log.info({ signal }, 'shutting down');
+      try {
+        await getPool().shutdown();
+      } catch (err) {
+        server.log.warn({ err }, 'pool shutdown failed');
+      }
+      try {
+        await server.close();
+      } catch {
+        /* ignore */
+      }
+      process.exit(0);
+    };
+    process.once('SIGTERM', () => void shutdown('SIGTERM'));
+    process.once('SIGINT', () => void shutdown('SIGINT'));
   } catch (err) {
     server.log.error(err);
     process.exit(1);
