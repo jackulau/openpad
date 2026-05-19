@@ -7,6 +7,7 @@ import websocket from '@fastify/websocket';
 import { env } from './env.js';
 import { authPlugin } from './plugins/auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerPadRoutes } from './routes/pads.js';
 
 export type AppServer = FastifyInstance;
 
@@ -47,6 +48,7 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   server.get('/api/health', async () => ({ ok: true }));
 
   await server.register(registerAuthRoutes, { prefix: '/api/auth' });
+  await server.register(registerPadRoutes, { prefix: '/api/pads' });
 
   return server;
 }
