@@ -67,11 +67,15 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const [spacePressed, setSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // Convenience: when exactly one is selected, treat as single-select for handles.
+  const selectedId = selectedIds.size === 1 ? [...selectedIds][0]! : null;
   const dragRef = useRef<
     | null
-    | { kind: 'move'; startX: number; startY: number; baseStroke: Stroke }
+    | { kind: 'move'; startX: number; startY: number; baseStrokes: Stroke[] }
     | { kind: 'resize'; handle: import('../lib/canvas-hit').HandleName; baseStroke: Stroke }
+    | { kind: 'marquee'; startX: number; startY: number }
   >(null);
 
   const yArrayRef = useRef<Y.Array<Stroke> | null>(null);
@@ -154,34 +158,46 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       }
       if (e.key === 'Escape') {
         setDraft(null);
-        setSelectedId(null);
+        setSelectedIds(new Set());
         return;
       }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      // Cmd/Ctrl+A — select all
+      if (meta && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setSelectedIds(new Set(strokes.map((s) => s.id)));
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.size > 0) {
         const arr = yArrayRef.current;
         if (!arr) return;
-        const idx = arr.toArray().findIndex((s) => s.id === selectedId);
-        if (idx >= 0) {
-          e.preventDefault();
-          arr.delete(idx, 1);
-          setSelectedId(null);
-        }
+        e.preventDefault();
+        arr.doc?.transact(() => {
+          // Delete in descending order so indices remain valid mid-transaction.
+          const toRemove: number[] = [];
+          arr.toArray().forEach((s, i) => {
+            if (selectedIds.has(s.id)) toRemove.push(i);
+          });
+          for (let i = toRemove.length - 1; i >= 0; i--) arr.delete(toRemove[i]!, 1);
+        });
+        setSelectedIds(new Set());
         return;
       }
-      if (selectedId && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      if (selectedIds.size > 0 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
         const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
         const arr = yArrayRef.current;
         if (!arr) return;
-        const idx = arr.toArray().findIndex((s) => s.id === selectedId);
-        if (idx < 0) return;
-        const current = arr.get(idx);
-        const next = libMoveStroke(current, dx, dy) as Stroke;
         arr.doc?.transact(() => {
-          arr.delete(idx, 1);
-          arr.insert(idx, [next]);
+          const cur = arr.toArray();
+          for (let i = 0; i < cur.length; i++) {
+            const s = cur[i]!;
+            if (!selectedIds.has(s.id)) continue;
+            const next = libMoveStroke(s, dx, dy) as Stroke;
+            arr.delete(i, 1);
+            arr.insert(i, [next]);
+          }
         });
         return;
       }
@@ -228,7 +244,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [active, selectedId]);
+  }, [active, selectedIds, strokes]);
 
   const zoomBy = useCallback((factor: number) => {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -282,8 +298,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
     const [x, y] = pos(e);
     try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* lost pointer */ }
     if (tool === 'select') {
-      // Priority: handle hit on the currently-selected stroke → resize.
-      // Else body hit on any stroke → move that stroke. Else deselect.
+      // Single-selection resize: handle hit on the lone selected stroke
       if (selectedId) {
         const sel = strokes.find((s) => s.id === selectedId);
         if (sel) {
@@ -297,10 +312,28 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       const idx = libHitStrokeIdx(strokes, x, y);
       if (idx >= 0) {
         const hit = strokes[idx];
-        setSelectedId(hit.id);
-        dragRef.current = { kind: 'move', startX: x, startY: y, baseStroke: hit };
+        let nextSet: Set<string>;
+        if (e.shiftKey) {
+          // shift-click: toggle hit in/out of selection
+          nextSet = new Set(selectedIds);
+          if (nextSet.has(hit.id)) nextSet.delete(hit.id);
+          else nextSet.add(hit.id);
+        } else if (selectedIds.has(hit.id)) {
+          // clicked already-selected stroke → keep selection, prepare to move whole group
+          nextSet = new Set(selectedIds);
+        } else {
+          nextSet = new Set([hit.id]);
+        }
+        setSelectedIds(nextSet);
+        const baseStrokes = strokes.filter((s) => nextSet.has(s.id));
+        dragRef.current = { kind: 'move', startX: x, startY: y, baseStrokes };
+      } else if (e.shiftKey) {
+        // shift-click empty: don't deselect, don't start marquee
       } else {
-        setSelectedId(null);
+        // empty click: start marquee
+        setSelectedIds(new Set());
+        setMarquee({ x, y, w: 0, h: 0 });
+        dragRef.current = { kind: 'marquee', startX: x, startY: y };
       }
       return;
     }
@@ -332,26 +365,44 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       setViewport((vp) => ({ ...vp, x: vp.x - dx, y: vp.y - dy }));
       return;
     }
-    // Select-tool drag: live-update the selected stroke in Yjs (one tx per
-    // pointer move; UndoManager bundles via captureTimeout=250).
+    // Select-tool drag: live-update the selected stroke(s) in Yjs (single tx
+    // per pointer move; UndoManager bundles via captureTimeout=250).
     if (tool === 'select' && dragRef.current) {
       const drag = dragRef.current;
       const [x, y] = pos(e);
       const arr = yArrayRef.current;
       if (!arr) return;
-      const idx = arr.toArray().findIndex((s) => s.id === drag.baseStroke.id);
-      if (idx < 0) return;
-      let next: Stroke;
-      if (drag.kind === 'move') {
-        const dx = x - drag.startX;
-        const dy = y - drag.startY;
-        next = libMoveStroke(drag.baseStroke, dx, dy) as Stroke;
-      } else {
-        next = libResizeStroke(drag.baseStroke, drag.handle, x, y) as Stroke;
+      if (drag.kind === 'marquee') {
+        setMarquee({
+          x: Math.min(drag.startX, x),
+          y: Math.min(drag.startY, y),
+          w: Math.abs(x - drag.startX),
+          h: Math.abs(y - drag.startY),
+        });
+        return;
       }
+      if (drag.kind === 'resize') {
+        const idx = arr.toArray().findIndex((s) => s.id === drag.baseStroke.id);
+        if (idx < 0) return;
+        const next = libResizeStroke(drag.baseStroke, drag.handle, x, y) as Stroke;
+        arr.doc?.transact(() => {
+          arr.delete(idx, 1);
+          arr.insert(idx, [next]);
+        });
+        return;
+      }
+      // move (one or many): single Yjs transaction for the whole group
+      const dx = x - drag.startX;
+      const dy = y - drag.startY;
       arr.doc?.transact(() => {
-        arr.delete(idx, 1);
-        arr.insert(idx, [next]);
+        const cur = arr.toArray();
+        for (const base of drag.baseStrokes) {
+          const idx = cur.findIndex((s) => s.id === base.id);
+          if (idx < 0) continue;
+          const next = libMoveStroke(base, dx, dy) as Stroke;
+          arr.delete(idx, 1);
+          arr.insert(idx, [next]);
+        }
       });
       return;
     }
@@ -379,6 +430,23 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       return;
     }
     if (dragRef.current) {
+      // Marquee finalizes selection: every stroke whose bbox intersects the
+      // rubber-band is added to the selection set.
+      if (dragRef.current.kind === 'marquee' && marquee && (marquee.w > 2 || marquee.h > 2)) {
+        const mx1 = marquee.x;
+        const my1 = marquee.y;
+        const mx2 = marquee.x + marquee.w;
+        const my2 = marquee.y + marquee.h;
+        const next = new Set<string>();
+        for (const s of strokes) {
+          const b = strokeBounds(s);
+          // bbox intersection test
+          if (b.maxX < mx1 || b.minX > mx2 || b.maxY < my1 || b.minY > my2) continue;
+          next.add(s.id);
+        }
+        setSelectedIds(next);
+      }
+      setMarquee(null);
       dragRef.current = null;
       return;
     }
@@ -496,39 +564,97 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
                 <StrokeShape key={s.id} stroke={s} />
               ))}
               {draft && <StrokeShape stroke={draft} />}
-              {selectedId && tool === 'select' && (() => {
-                const sel = strokes.find((s) => s.id === selectedId);
-                if (!sel) return null;
-                const b = strokeBounds(sel);
-                const handles = handlesFor(sel);
+              {selectedIds.size > 0 && tool === 'select' && (() => {
+                const selectedStrokes = strokes.filter((s) => selectedIds.has(s.id));
+                if (selectedStrokes.length === 0) return null;
                 const handleSize = Math.max(6, 8 / Math.max(0.5, viewport.zoom));
+                if (selectedStrokes.length === 1) {
+                  const sel = selectedStrokes[0]!;
+                  const b = strokeBounds(sel);
+                  const handles = handlesFor(sel);
+                  return (
+                    <g pointerEvents="none">
+                      <rect
+                        x={b.minX}
+                        y={b.minY}
+                        width={b.maxX - b.minX}
+                        height={b.maxY - b.minY}
+                        fill="none"
+                        stroke="#60a5fa"
+                        strokeWidth={1.5 / Math.max(0.5, viewport.zoom)}
+                        strokeDasharray={`${4 / Math.max(0.5, viewport.zoom)} ${3 / Math.max(0.5, viewport.zoom)}`}
+                      />
+                      {handles.map((h) => (
+                        <rect
+                          key={h.name}
+                          x={h.x - handleSize / 2}
+                          y={h.y - handleSize / 2}
+                          width={handleSize}
+                          height={handleSize}
+                          fill="#60a5fa"
+                          stroke="#ffffff"
+                          strokeWidth={1 / Math.max(0.5, viewport.zoom)}
+                        />
+                      ))}
+                    </g>
+                  );
+                }
+                // Multi-selection: union bbox, no per-stroke handles
+                const u = selectedStrokes.map(strokeBounds).reduce<typeof selectedStrokes[number] extends never ? null : { minX: number; minY: number; maxX: number; maxY: number } | null>((acc, b) => {
+                  if (!acc) return b;
+                  return {
+                    minX: Math.min(acc.minX, b.minX),
+                    minY: Math.min(acc.minY, b.minY),
+                    maxX: Math.max(acc.maxX, b.maxX),
+                    maxY: Math.max(acc.maxY, b.maxY),
+                  };
+                }, null);
+                if (!u) return null;
                 return (
                   <g pointerEvents="none">
+                    {/* per-stroke faint outlines */}
+                    {selectedStrokes.map((s) => {
+                      const b = strokeBounds(s);
+                      return (
+                        <rect
+                          key={s.id}
+                          x={b.minX}
+                          y={b.minY}
+                          width={b.maxX - b.minX}
+                          height={b.maxY - b.minY}
+                          fill="#60a5fa18"
+                          stroke="#60a5fa"
+                          strokeWidth={1 / Math.max(0.5, viewport.zoom)}
+                          strokeDasharray={`${2 / Math.max(0.5, viewport.zoom)} ${2 / Math.max(0.5, viewport.zoom)}`}
+                        />
+                      );
+                    })}
+                    {/* union outline */}
                     <rect
-                      x={b.minX}
-                      y={b.minY}
-                      width={b.maxX - b.minX}
-                      height={b.maxY - b.minY}
+                      x={u.minX}
+                      y={u.minY}
+                      width={u.maxX - u.minX}
+                      height={u.maxY - u.minY}
                       fill="none"
-                      stroke="#60a5fa"
+                      stroke="#3b82f6"
                       strokeWidth={1.5 / Math.max(0.5, viewport.zoom)}
-                      strokeDasharray={`${4 / Math.max(0.5, viewport.zoom)} ${3 / Math.max(0.5, viewport.zoom)}`}
                     />
-                    {handles.map((h) => (
-                      <rect
-                        key={h.name}
-                        x={h.x - handleSize / 2}
-                        y={h.y - handleSize / 2}
-                        width={handleSize}
-                        height={handleSize}
-                        fill="#60a5fa"
-                        stroke="#ffffff"
-                        strokeWidth={1 / Math.max(0.5, viewport.zoom)}
-                      />
-                    ))}
                   </g>
                 );
               })()}
+              {marquee && tool === 'select' && (
+                <rect
+                  pointerEvents="none"
+                  x={marquee.x}
+                  y={marquee.y}
+                  width={marquee.w}
+                  height={marquee.h}
+                  fill="#60a5fa20"
+                  stroke="#60a5fa"
+                  strokeWidth={1 / Math.max(0.5, viewport.zoom)}
+                  strokeDasharray={`${3 / Math.max(0.5, viewport.zoom)} ${2 / Math.max(0.5, viewport.zoom)}`}
+                />
+              )}
             </g>
           </svg>
         )}
