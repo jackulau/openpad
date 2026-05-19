@@ -40,7 +40,7 @@ export function Register() {
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
-          <span className="text-sm text-zinc-300">Display name</span>
+          <span className="text-sm text-secondary">Display name</span>
           <input
             type="text"
             autoComplete="nickname"
@@ -53,7 +53,7 @@ export function Register() {
           />
         </label>
         <label className="block">
-          <span className="text-sm text-zinc-300">Email</span>
+          <span className="text-sm text-secondary">Email</span>
           <input
             type="email"
             autoComplete="email"
@@ -64,7 +64,7 @@ export function Register() {
           />
         </label>
         <label className="block">
-          <span className="text-sm text-zinc-300">Password</span>
+          <span className="text-sm text-secondary">Password</span>
           <input
             type="password"
             autoComplete="new-password"
@@ -74,10 +74,10 @@ export function Register() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <span className="text-xs text-zinc-500 mt-1 block">At least 8 characters.</span>
+          <span className="text-xs text-subtle mt-1 block">At least 8 characters.</span>
         </label>
         {err && (
-          <div className="text-sm text-red-400" role="alert">
+          <div className="text-sm text-danger" role="alert">
             {err}
           </div>
         )}
@@ -85,9 +85,9 @@ export function Register() {
           {loading ? 'Creating…' : 'Create account'}
         </button>
       </form>
-      <div className="text-sm text-zinc-400">
+      <div className="text-sm text-secondary">
         Already have one?{' '}
-        <Link to="/login" className="text-brand-400 hover:underline">
+        <Link to="/login" className="text-accent hover:underline">
           Log in
         </Link>
       </div>

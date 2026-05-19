@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { customAlphabet } from 'nanoid';
 
 // readable, no ambiguous chars
@@ -62,7 +63,10 @@ const nouns = [
   'willow',
 ];
 
-const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)];
+// Use a CSPRNG even for the human-readable portion. Slugs aren't security
+// boundaries on their own, but predictable slugs let an attacker enumerate
+// "fresh-pad" URLs and try unlock passwords against them.
+const pick = <T>(xs: readonly T[]): T => xs[randomInt(0, xs.length)];
 
 export function generateSlug(): string {
   return `${pick(adjectives)}-${pick(nouns)}-${nano().slice(0, 5)}`;

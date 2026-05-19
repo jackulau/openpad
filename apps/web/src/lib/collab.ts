@@ -51,6 +51,12 @@ export interface PresenceUser {
   color: string;
   fileId?: string;
   cursor?: { line: number; column: number };
+  selection?: {
+    startLine: number;
+    startColumn: number;
+    endLine: number;
+    endColumn: number;
+  };
 }
 
 export interface ChatMessage {
@@ -86,7 +92,13 @@ export class CollabClient {
 
   private url(): string {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}/ws/pad/${this.slug}?token=${encodeURIComponent(this.token)}`;
+    return `${proto}://${window.location.host}/ws/pad/${this.slug}`;
+  }
+
+  // Browsers can't send Authorization on a WS upgrade, so the bearer token
+  // rides in the Sec-WebSocket-Protocol header. Keeps it out of URLs and logs.
+  private subprotocols(): string[] {
+    return [`oc.bearer.${this.token}`];
   }
 
   private setStatus(s: CollabStatus) {
@@ -113,7 +125,7 @@ export class CollabClient {
 
   private connect(): void {
     this.setStatus(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting');
-    this.ws = new WebSocket(this.url());
+    this.ws = new WebSocket(this.url(), this.subprotocols());
     this.ws.binaryType = 'arraybuffer';
 
     this.ws.onopen = () => {

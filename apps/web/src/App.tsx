@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
 import { Landing } from './pages/Landing';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { CommandPalette } from './components/CommandPalette';
 import { useAuth } from './lib/authStore';
 
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
@@ -20,7 +21,8 @@ export function App() {
   }, [hydrate]);
 
   return (
-    <Suspense fallback={<div className="p-8 text-zinc-400">loading…</div>}>
+    <Suspense fallback={<div className="p-8 text-secondary">loading…</div>}>
+      <CommandPalette />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />

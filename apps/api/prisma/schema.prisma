@@ -42,6 +42,7 @@ model Pad {
   passwordHash    String?
   passwordRole    String    @default("collaborator")
   packages        String?
+  autoRecord      Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -51,6 +52,7 @@ model Pad {
   messages    ChatMessage[]
   editEvents  EditEvent[]
   interview   InterviewScore?
+  recordings  Recording[]
 
   @@index([ownerId])
   @@index([slug])
@@ -145,6 +147,36 @@ model Question {
 
   @@index([createdBy])
   @@index([difficulty])
+}
+
+model Recording {
+  id           String    @id @default(cuid())
+  padId        String
+  pad          Pad       @relation(fields: [padId], references: [id], onDelete: Cascade)
+  createdBy    String?   // null if auto-started
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  durationMs   Int?
+  participants String    @default("[]") // JSON array of {userId,name}
+  autoStarted  Boolean   @default(false)
+  meta         String?   // JSON
+  createdAt    DateTime  @default(now())
+
+  @@index([padId, startedAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  // null = unauthenticated action (rate-limited rejection, failed login)
+  action    String   // see lib/audit.ts AuditAction enum
+  target    String?  // slug/id of the affected resource
+  meta      String?  // JSON-encoded extra context
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
 
 model InterviewScore {

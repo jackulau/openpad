@@ -88,27 +88,27 @@ export function InvitesPanel({ slug, onClose }: Props) {
             Share link
           </button>
         </div>
-        {err && <div className="text-xs text-red-400">{err}</div>}
+        {err && <div className="text-xs text-danger">{err}</div>}
 
         <PasswordSection slug={slug} />
 
         <div className="space-y-2">
-          <h3 className="text-xs uppercase tracking-wide text-zinc-500">Active invites</h3>
-          {list.isLoading && <div className="text-zinc-500 text-sm">loading…</div>}
+          <h3 className="text-xs uppercase tracking-wide text-subtle">Active invites</h3>
+          {list.isLoading && <div className="text-subtle text-sm">loading…</div>}
           {list.data?.invites.length === 0 && (
-            <div className="text-zinc-500 text-sm">No invites yet.</div>
+            <div className="text-subtle text-sm">No invites yet.</div>
           )}
           <ul className="space-y-2">
             {list.data?.invites.map((inv) => (
               <li
                 key={inv.id}
-                className="flex items-center justify-between gap-3 p-3 border border-zinc-800 rounded"
+                className="flex items-center justify-between gap-3 p-3 border border-line rounded"
               >
                 <div className="min-w-0">
                   <div className="text-sm flex items-center gap-2">
                     <span className="font-medium">{inv.email ?? 'Anyone with link'}</span>
-                    <span className="text-xs text-brand-400">{inv.role}</span>
-                    {inv.usedAt && <span className="text-xs text-zinc-500">used</span>}
+                    <span className="text-xs text-accent">{inv.role}</span>
+                    {inv.usedAt && <span className="text-xs text-subtle">used</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <input
@@ -121,7 +121,7 @@ export function InvitesPanel({ slug, onClose }: Props) {
                   </div>
                 </div>
                 <button
-                  className="btn-ghost text-zinc-400 hover:text-red-400"
+                  className="btn-ghost text-secondary hover:text-danger"
                   onClick={() => revoke.mutate(inv.id)}
                   title="Revoke"
                 >
@@ -175,9 +175,9 @@ function PasswordSection({ slug }: { slug: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pad-preview', slug] }),
   });
   return (
-    <div className="space-y-2 border-t border-zinc-800 pt-3">
-      <h3 className="text-xs uppercase tracking-wide text-zinc-500">Password gate</h3>
-      <p className="text-xs text-zinc-500">
+    <div className="space-y-2 border-t border-line pt-3">
+      <h3 className="text-xs uppercase tracking-wide text-subtle">Password gate</h3>
+      <p className="text-xs text-subtle">
         Optional. Anyone with the link can join after entering this password —{' '}
         {preview.data?.hasPassword ? 'currently enabled.' : 'currently disabled.'}
       </p>
@@ -207,7 +207,7 @@ function PasswordSection({ slug }: { slug: string }) {
         </button>
         {preview.data?.hasPassword && (
           <button
-            className="btn-ghost text-red-400"
+            className="btn-ghost text-danger"
             onClick={() => clear.mutate()}
             disabled={clear.isPending}
           >
@@ -215,7 +215,7 @@ function PasswordSection({ slug }: { slug: string }) {
           </button>
         )}
       </div>
-      {err && <div className="text-xs text-red-400">{err}</div>}
+      {err && <div className="text-xs text-danger">{err}</div>}
     </div>
   );
 }

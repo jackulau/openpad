@@ -36,31 +36,27 @@ export function resetDockerCache(): void {
   dockerAvailableCache = null;
 }
 
-export async function runInDocker(
+// Pure builder so the sandbox flags can be unit-tested without invoking docker.
+// Order is significant — keep flags grouped (rm/io → network → fs → caps → resources).
+export function buildDockerArgs(
   lang: LanguageSpec,
   sandboxDir: string,
   filename: string,
-  stdin: string | undefined,
-  timeoutMs: number,
-): Promise<ExecResult> {
-  if (!lang.docker) {
-    return {
-      stdout: '',
-      stderr: `language ${lang.id} has no docker image configured`,
-      exitCode: 127,
-      timedOut: false,
-      durationMs: 0,
-    };
-  }
-  const args = [
+): string[] {
+  if (!lang.docker) throw new Error(`language ${lang.id} has no docker image configured`);
+  return [
     'run',
     '--rm',
     '-i',
     '--network',
     'none',
+    '--ipc',
+    'private',
     '--read-only',
     '--security-opt',
     'no-new-privileges',
+    '--security-opt',
+    'seccomp=runtime/default',
     '--cap-drop',
     'ALL',
     '--user',
@@ -84,7 +80,25 @@ export async function runInDocker(
     lang.docker.image,
     ...lang.docker.runCmd(filename),
   ];
-  return runProcess('docker', args, stdin, timeoutMs);
+}
+
+export async function runInDocker(
+  lang: LanguageSpec,
+  sandboxDir: string,
+  filename: string,
+  stdin: string | undefined,
+  timeoutMs: number,
+): Promise<ExecResult> {
+  if (!lang.docker) {
+    return {
+      stdout: '',
+      stderr: `language ${lang.id} has no docker image configured`,
+      exitCode: 127,
+      timedOut: false,
+      durationMs: 0,
+    };
+  }
+  return runProcess('docker', buildDockerArgs(lang, sandboxDir, filename), stdin, timeoutMs);
 }
 
 export function runProcess(

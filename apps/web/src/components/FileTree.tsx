@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { filesApi, type FileMeta } from '../lib/files';
 import { HttpError } from '../lib/api';
+import type { PresenceUser } from '../lib/collab';
 
 interface Props {
   slug: string;
@@ -9,9 +10,34 @@ interface Props {
   activeFileId: string | null;
   onActivate: (file: FileMeta) => void;
   canEdit: boolean;
+  presence?: Record<string, PresenceUser>;
+  myUserId?: string | null;
 }
 
-export function FileTree({ slug, files, activeFileId, onActivate, canEdit }: Props) {
+export function FileTree({
+  slug,
+  files,
+  activeFileId,
+  onActivate,
+  canEdit,
+  presence,
+  myUserId,
+}: Props) {
+  // Group remote users by the file they're currently viewing so each file row
+  // can show a small stack of colored dots — same affordance as Google Docs
+  // "who's on this doc" indicators, but per file.
+  const viewersByFile = useMemo(() => {
+    const map = new Map<string, PresenceUser[]>();
+    if (!presence) return map;
+    for (const p of Object.values(presence)) {
+      if (!p.fileId) continue;
+      if (myUserId && p.userId === myUserId) continue;
+      const list = map.get(p.fileId) ?? [];
+      list.push(p);
+      map.set(p.fileId, list);
+    }
+    return map;
+  }, [presence, myUserId]);
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -53,10 +79,10 @@ export function FileTree({ slug, files, activeFileId, onActivate, canEdit }: Pro
   return (
     <div className="text-sm">
       <div className="flex items-center justify-between px-2 mb-1">
-        <span className="text-xs uppercase tracking-wide text-zinc-500">Files</span>
+        <span className="text-xs uppercase tracking-wide text-subtle">Files</span>
         {canEdit && (
           <button
-            className="text-zinc-400 hover:text-zinc-100 text-base leading-none"
+            className="text-secondary hover:text-primary text-base leading-none"
             onClick={() => setAdding((v) => !v)}
             title="New file"
           >
@@ -90,9 +116,9 @@ export function FileTree({ slug, files, activeFileId, onActivate, canEdit }: Pro
       )}
 
       {err && (
-        <div className="px-2 text-xs text-red-400 mb-1">
+        <div className="px-2 text-xs text-danger mb-1">
           {err}
-          <button className="ml-2 text-zinc-500" onClick={() => setErr(null)}>
+          <button className="ml-2 text-subtle" onClick={() => setErr(null)}>
             dismiss
           </button>
         </div>
@@ -131,8 +157,8 @@ export function FileTree({ slug, files, activeFileId, onActivate, canEdit }: Pro
                 <div
                   className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer ${
                     isActive
-                      ? 'bg-zinc-800 text-zinc-100'
-                      : 'text-zinc-400 hover:bg-zinc-900'
+                      ? 'bg-elevated text-primary'
+                      : 'text-secondary hover:bg-surface'
                   }`}
                   onClick={() => onActivate(f)}
                   onDoubleClick={() => {
@@ -143,9 +169,10 @@ export function FileTree({ slug, files, activeFileId, onActivate, canEdit }: Pro
                   }}
                 >
                   <span className="truncate">{f.name}</span>
+                  <FileViewers viewers={viewersByFile.get(f.id) ?? []} />
                   {canEdit && (
                     <button
-                      className="opacity-0 group-hover:opacity-100 transition text-zinc-500 hover:text-red-400 text-xs"
+                      className="opacity-0 group-hover:opacity-100 transition text-subtle hover:text-danger text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (confirm(`Delete ${f.name}?`)) del.mutate(f.id);
@@ -162,5 +189,29 @@ export function FileTree({ slug, files, activeFileId, onActivate, canEdit }: Pro
         })}
       </ul>
     </div>
+  );
+}
+
+// Up to three colored dots per file row, plus +N overflow. Names go in the
+// title attribute so hovering reveals the full roster.
+function FileViewers({ viewers }: { viewers: PresenceUser[] }) {
+  if (viewers.length === 0) return null;
+  const visible = viewers.slice(0, 3);
+  const overflow = viewers.length - visible.length;
+  const title = viewers.map((v) => v.name).join(', ');
+  return (
+    <span className="flex items-center gap-0.5 ml-auto" title={title}>
+      {visible.map((v) => (
+        <span
+          key={v.userId}
+          className="size-2 rounded-full ring-1 ring-page"
+          style={{ backgroundColor: v.color }}
+          aria-hidden="true"
+        />
+      ))}
+      {overflow > 0 && (
+        <span className="text-[10px] text-subtle ml-0.5">+{overflow}</span>
+      )}
+    </span>
   );
 }

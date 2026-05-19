@@ -31,7 +31,7 @@ export function Login() {
     <AuthLayout title="Log in" subtitle="Welcome back to opencoder.">
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="block">
-          <span className="text-sm text-zinc-300">Email</span>
+          <span className="text-sm text-secondary">Email</span>
           <input
             type="email"
             autoComplete="email"
@@ -42,7 +42,7 @@ export function Login() {
           />
         </label>
         <label className="block">
-          <span className="text-sm text-zinc-300">Password</span>
+          <span className="text-sm text-secondary">Password</span>
           <input
             type="password"
             autoComplete="current-password"
@@ -54,7 +54,7 @@ export function Login() {
           />
         </label>
         {err && (
-          <div className="text-sm text-red-400" role="alert">
+          <div className="text-sm text-danger" role="alert">
             {err}
           </div>
         )}
@@ -62,9 +62,9 @@ export function Login() {
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      <div className="text-sm text-zinc-400">
+      <div className="text-sm text-secondary">
         New here?{' '}
-        <Link to="/register" className="text-brand-400 hover:underline">
+        <Link to="/register" className="text-accent hover:underline">
           Create an account
         </Link>
       </div>

@@ -25,9 +25,16 @@ async function createPad(token: string): Promise<string> {
   return r.json().pad.slug as string;
 }
 
-function open(url: string): Promise<{ ws: WebSocket; msgs: Array<Record<string, unknown>> }> {
+function open(
+  urlWithToken: string,
+): Promise<{ ws: WebSocket; msgs: Array<Record<string, unknown>> }> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
+    // Legacy tests still pass `?token=` in the URL; rewrite to the subprotocol
+    // carrier the server now expects, but keep the call sites unchanged.
+    const u = new URL(urlWithToken);
+    const tok = u.searchParams.get('token') ?? '';
+    u.searchParams.delete('token');
+    const ws = new WebSocket(u.toString(), tok ? [`oc.bearer.${tok}`] : undefined);
     const msgs: Array<Record<string, unknown>> = [];
     ws.on('message', (raw: Buffer) => {
       try {

@@ -13,14 +13,24 @@ import {
   applyUpdate,
   broadcast,
   ensureFile,
+  getPresenceCounts,
   getStateAsUpdate,
   removeConn,
   type PadConn,
 } from './hub.js';
 import { prisma } from '../db.js';
 import { canEdit, canView, getPadAccess } from '../lib/permissions.js';
+import * as recording from '../services/recordings.js';
+
+function countConns(padId: string): number {
+  return getPresenceCounts()[padId] ?? 0;
+}
 
 const PRESENCE_BY_CONN = new WeakMap<WebSocket, Record<string, unknown>>();
+// padId → userId → latest awareness payload. Replayed to late joiners on HELLO
+// so they see existing cursors immediately (Google-Docs style) rather than
+// waiting for the next keystroke from each peer.
+const PRESENCE_BY_PAD = new Map<string, Map<string, { fileId: string; payload: Buffer }>>();
 
 const COLORS = [
   '#f97316',
@@ -72,6 +82,7 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
   }
   conn.padId = access.pad.id;
   addConn(conn);
+  void recording.onParticipantJoin(conn.padId, conn.userId, conn.userName);
   ws.removeListener('message', earlyListener);
 
   ws.on('pong', () => {
@@ -105,6 +116,15 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
           const state = await ensureFile(access.pad.id, hello.fileId);
           ws.send(encodeBinaryWithFile(MSG.STATE, hello.fileId, getStateAsUpdate(state.doc)));
         }
+        // Replay cached awareness for this pad so the joiner sees existing
+        // cursors immediately. Skip the joiner's own entry.
+        const cached = PRESENCE_BY_PAD.get(access.pad.id);
+        if (cached) {
+          for (const [otherId, entry] of cached) {
+            if (otherId === user.sub) continue;
+            ws.send(encodeBinaryWithFile(MSG.AWARENESS, entry.fileId, entry.payload));
+          }
+        }
         return;
       }
       if (type === MSG.UPDATE) {
@@ -129,19 +149,30 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
       }
       if (type === MSG.AWARENESS) {
         const { fileId, payload } = decodeBinaryWithFile(raw);
+        // Stamp the server-authoritative identity into the payload so peers
+        // can't spoof another user's name/color via crafted awareness frames.
+        let stamped: Buffer = payload;
         try {
-          const parsed = JSON.parse(payload.toString('utf8'));
-          PRESENCE_BY_CONN.set(ws, {
+          const parsed = JSON.parse(payload.toString('utf8')) as Record<string, unknown>;
+          const authoritative = {
             ...parsed,
             userId: user.sub,
             name: user.name,
             color: conn.color,
             fileId,
-          });
+          };
+          PRESENCE_BY_CONN.set(ws, authoritative);
+          stamped = Buffer.from(JSON.stringify(authoritative));
+          let padMap = PRESENCE_BY_PAD.get(access.pad.id);
+          if (!padMap) {
+            padMap = new Map();
+            PRESENCE_BY_PAD.set(access.pad.id, padMap);
+          }
+          padMap.set(user.sub, { fileId, payload: stamped });
         } catch {
-          /* ignore */
+          /* ignore — relay the raw payload so legacy clients still work */
         }
-        broadcast(access.pad.id, ws, encodeBinaryWithFile(MSG.AWARENESS, fileId, payload));
+        broadcast(access.pad.id, ws, encodeBinaryWithFile(MSG.AWARENESS, fileId, stamped));
         return;
       }
       if (type === MSG.PING) {
@@ -166,10 +197,24 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
   ws.on('close', () => {
     clearInterval(keepalive);
     removeConn(conn);
+    const remaining = countConns(access.pad.id);
+    void recording.onParticipantLeave(access.pad.id, remaining);
+    // Drop the user's cached awareness so a fresh join shows them only after
+    // they re-broadcast presence.
+    const padMap = PRESENCE_BY_PAD.get(access.pad.id);
+    if (padMap) {
+      padMap.delete(user.sub);
+      if (padMap.size === 0) PRESENCE_BY_PAD.delete(access.pad.id);
+    }
+    // Use binary frame so client decodeBinaryWithFile parses correctly. Empty
+    // fileId is fine; payload carries the leave marker as JSON.
+    const leavePayload = Buffer.from(
+      JSON.stringify({ type: 'leave', userId: user.sub }),
+    );
     broadcast(
       access.pad.id,
       null,
-      encodeJSON(MSG.AWARENESS, { type: 'leave', userId: user.sub }),
+      encodeBinaryWithFile(MSG.AWARENESS, '', leavePayload),
     );
   });
 }

@@ -36,7 +36,9 @@ export async function registerExecRoutes(server: FastifyInstance): Promise<void>
       timeoutMs: parsed.data.timeoutMs,
     });
 
-    // record run event for playback
+    // Record run event for playback. We persist truncated stdout/stderr so
+    // recording playback can replay the actual output, not just the metadata.
+    const STREAM_CAP = 64 * 1024; // 64 KB per stream
     try {
       await prisma.editEvent.create({
         data: {
@@ -51,6 +53,10 @@ export async function registerExecRoutes(server: FastifyInstance): Promise<void>
               durationMs: result.durationMs,
               stdoutLen: result.stdout.length,
               stderrLen: result.stderr.length,
+              stdout: result.stdout.slice(0, STREAM_CAP),
+              stderr: result.stderr.slice(0, STREAM_CAP),
+              stdoutTruncated: result.stdout.length > STREAM_CAP,
+              stderrTruncated: result.stderr.length > STREAM_CAP,
             }),
           ),
         },

@@ -5,6 +5,7 @@ import { prisma } from '../db.js';
 import { clearToken, issueToken } from '../lib/auth.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
 import { randomToken } from '../lib/slug.js';
+import { recordAudit } from '../lib/audit.js';
 
 const registerBody = z.object({
   email: z.string().email().max(254),
@@ -17,11 +18,17 @@ const loginBody = z.object({
   password: z.string().min(1).max(200),
 });
 
+// Rate limits for auth endpoints. Picked to allow real humans (multiple tries
+// on a forgotten password, friends typing names) while blocking unauth abuse.
+const GUEST_RATE = { max: 10, timeWindow: '1 minute' };
+const REGISTER_RATE = { max: 5, timeWindow: '1 minute' };
+const LOGIN_RATE = { max: 10, timeWindow: '1 minute' };
+
 export async function registerAuthRoutes(server: FastifyInstance): Promise<void> {
   // Friction-free signup: just pick a name. Returns a token immediately.
   // Use this for the friends-only flow. /register stays for users who want
   // an email + password they can log back in with.
-  server.post('/guest', async (req, reply) => {
+  server.post('/guest', { config: { rateLimit: GUEST_RATE } }, async (req, reply) => {
     const parsed = z
       .object({ name: z.string().trim().min(1).max(80) })
       .safeParse(req.body ?? {});
@@ -43,7 +50,7 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     });
   });
 
-  server.post('/register', async (req, reply) => {
+  server.post('/register', { config: { rateLimit: REGISTER_RATE } }, async (req, reply) => {
     const parsed = registerBody.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
@@ -63,16 +70,22 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     });
   });
 
-  server.post('/login', async (req, reply) => {
+  server.post('/login', { config: { rateLimit: LOGIN_RATE } }, async (req, reply) => {
     const parsed = loginBody.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
     }
     const { email, password } = parsed.data;
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (!user) return reply.code(401).send({ error: 'invalid_credentials' });
+    if (!user) {
+      recordAudit({ action: 'login.fail', target: email.toLowerCase(), req, meta: { reason: 'no_user' } });
+      return reply.code(401).send({ error: 'invalid_credentials' });
+    }
     const ok = await verifyPassword(password, user.passwordHash);
-    if (!ok) return reply.code(401).send({ error: 'invalid_credentials' });
+    if (!ok) {
+      recordAudit({ action: 'login.fail', userId: user.id, target: email.toLowerCase(), req, meta: { reason: 'bad_password' } });
+      return reply.code(401).send({ error: 'invalid_credentials' });
+    }
     const token = await issueToken(reply, { sub: user.id, email: user.email, name: user.name });
     return reply.send({
       token,
@@ -121,6 +134,8 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     }
     if (Object.keys(data).length === 0) return reply.code(400).send({ error: 'no_changes' });
     const updated = await prisma.user.update({ where: { id: userId }, data });
+    if (data.name) recordAudit({ action: 'user.name.change', userId, req });
+    if (data.passwordHash) recordAudit({ action: 'user.password.change', userId, req });
     return {
       user: {
         id: updated.id,
@@ -145,6 +160,7 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     const ok = await verifyPassword(parsed.data.password, user.passwordHash);
     if (!ok) return reply.code(401).send({ error: 'wrong_password' });
     await prisma.user.delete({ where: { id: userId } });
+    recordAudit({ action: 'user.delete', userId, req, meta: { email: user.email } });
     clearToken(reply);
     return { ok: true };
   });

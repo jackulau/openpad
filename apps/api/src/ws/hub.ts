@@ -30,6 +30,53 @@ const EVICT_EMPTY_AFTER_MS = 60_000;
 let flushTimer: NodeJS.Timeout | null = null;
 const emptySince = new Map<string, number>();
 
+// Presence observers: anyone (SSE, REST) that wants live "who's in pad X"
+// counts subscribes here. The callback fires on every connect/disconnect with
+// the affected padId. Consumers call getPresenceCounts() to read state.
+type PresenceObserver = (padId: string) => void;
+const presenceObservers = new Set<PresenceObserver>();
+
+function notifyPresence(padId: string): void {
+  for (const cb of presenceObservers) {
+    try {
+      cb(padId);
+    } catch {
+      /* observer errors must not break the hub */
+    }
+  }
+}
+
+export function subscribePresence(cb: PresenceObserver): () => void {
+  presenceObservers.add(cb);
+  return () => presenceObservers.delete(cb);
+}
+
+export function getPresenceCounts(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [padId, room] of rooms) {
+    if (room.conns.size > 0) out[padId] = room.conns.size;
+  }
+  return out;
+}
+
+export interface PresenceUser {
+  userId: string;
+  name: string;
+  color: string;
+}
+
+export function getPresenceUsers(padId: string): PresenceUser[] {
+  const room = rooms.get(padId);
+  if (!room) return [];
+  const seen = new Map<string, PresenceUser>();
+  for (const c of room.conns) {
+    if (!seen.has(c.userId)) {
+      seen.set(c.userId, { userId: c.userId, name: c.userName, color: c.color });
+    }
+  }
+  return Array.from(seen.values());
+}
+
 function startFlushLoop(): void {
   if (flushTimer) return;
   flushTimer = setInterval(() => {
@@ -97,6 +144,7 @@ export function addConn(conn: PadConn): void {
   const room = getOrCreateRoom(conn.padId);
   room.conns.add(conn);
   emptySince.delete(conn.padId);
+  notifyPresence(conn.padId);
 }
 
 export function removeConn(conn: PadConn): void {
@@ -104,6 +152,7 @@ export function removeConn(conn: PadConn): void {
   if (!room) return;
   room.conns.delete(conn);
   if (room.conns.size === 0) emptySince.set(conn.padId, Date.now());
+  notifyPresence(conn.padId);
 }
 
 export function listConns(padId: string): PadConn[] {

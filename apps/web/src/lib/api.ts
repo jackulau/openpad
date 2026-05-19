@@ -34,14 +34,18 @@ async function request<T>(
   opts: { signal?: AbortSignal } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['content-type'] = 'application/json';
+  // Fastify rejects bodyless POST/PATCH/DELETE with 415 when the route declares
+  // a content-type body parser. Set it unconditionally for methods that can
+  // carry a body; serialise `undefined` → `{}` so the wire is always valid JSON.
+  const hasBody = method !== 'GET' && method !== 'HEAD';
+  if (hasBody) headers['content-type'] = 'application/json';
   const token = getToken();
   if (token) headers['authorization'] = `Bearer ${token}`;
 
   const res = await fetch(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: hasBody ? JSON.stringify(body ?? {}) : undefined,
     credentials: 'include',
     signal: opts.signal,
   });

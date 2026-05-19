@@ -12,7 +12,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }, [hydrate]);
 
   if (!hydrated) {
-    return <div className="p-8 text-zinc-400">loading…</div>;
+    return <div className="p-8 text-secondary">loading…</div>;
   }
   if (!user) {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;

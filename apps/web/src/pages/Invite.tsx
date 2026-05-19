@@ -43,11 +43,11 @@ export function InvitePage() {
   return (
     <>
       <AppHeader />
-      <main className="max-w-md mx-auto p-6">
-        <div className="card p-6 space-y-4">
-          {preview.isLoading && <div className="text-zinc-400 text-sm">checking invite…</div>}
+      <main className="max-w-md mx-auto px-4 py-12">
+        <div className="card p-6 space-y-4 shadow-soft">
+          {preview.isLoading && <div className="text-secondary text-sm">checking invite…</div>}
           {preview.error && (
-            <div className="text-red-400 text-sm">
+            <div className="text-danger text-sm">
               {preview.error instanceof HttpError ? prettyError(preview.error.error) : 'Failed'}
             </div>
           )}
@@ -75,23 +75,35 @@ function InviteCard({
 }) {
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">You've been invited</h1>
-      <p className="text-sm text-zinc-300">
-        Pad: <span className="font-medium">{inv.padTitle}</span> (
-        <code className="text-zinc-500">{inv.padSlug}</code>)
-      </p>
-      <p className="text-sm text-zinc-400">
-        Role: <span className="text-brand-400">{inv.role}</span>
-        {inv.emailRestricted && ' · bound to invited email'}
-      </p>
-      {inv.expiresAt && (
-        <p className="text-xs text-zinc-500">
-          Expires {new Date(inv.expiresAt).toLocaleString()}
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-accent">
+        <span className="size-1.5 rounded-full bg-accent" />
+        Invitation
+      </div>
+      <h1 className="text-2xl font-semibold tracking-tight text-primary">You've been invited</h1>
+      <div className="space-y-2 text-sm">
+        <p className="text-secondary">
+          Pad: <span className="font-medium text-primary">{inv.padTitle}</span>{' '}
+          <code className="text-subtle text-[12px]">{inv.padSlug}</code>
+        </p>
+        <p className="text-secondary">
+          Role: <span className="chip chip-accent">{inv.role}</span>
+          {inv.emailRestricted && (
+            <span className="ml-2 text-xs text-subtle">bound to invited email</span>
+          )}
+        </p>
+        {inv.expiresAt && (
+          <p className="text-xs text-subtle">
+            Expires {new Date(inv.expiresAt).toLocaleString()}
+          </p>
+        )}
+      </div>
+      {err && (
+        <p className="text-sm text-danger" role="alert">
+          {err}
         </p>
       )}
-      {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
-      <button className="btn-primary w-full" onClick={onAccept} disabled={busy}>
-        {!signedIn ? 'Sign in & join' : busy ? 'Joining…' : 'Join pad'}
+      <button className="btn-primary w-full !py-2.5" onClick={onAccept} disabled={busy}>
+        {!signedIn ? 'Sign in & join' : busy ? 'Joining…' : 'Join pad →'}
       </button>
     </div>
   );

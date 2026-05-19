@@ -2,13 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Semantic design tokens. Components reference these via Tailwind utilities like
+ * `bg-surface`, `text-primary`, `border-default` (registered in tailwind.config.js).
+ * Both palettes are tuned to professional code-editor norms — slate-tinted dark,
+ * cool-neutral light — without the harsh pure-black / pure-white extremes.
+ */
 @layer base {
+  :root,
+  html.light {
+    --oc-bg-page: 245 246 248;          /* zinc-50ish, slight cool tint */
+    --oc-bg-surface: 255 255 255;
+    --oc-bg-elevated: 250 251 253;
+    --oc-bg-input: 255 255 255;
+    --oc-bg-hover: 244 244 248;
+    --oc-bg-muted: 241 242 246;
+    --oc-text-primary: 17 24 39;        /* zinc-900 */
+    --oc-text-secondary: 71 85 105;     /* slate-600 */
+    --oc-text-muted: 113 122 137;       /* slate-500 */
+    --oc-text-inverted: 250 250 252;
+    --oc-border-default: 226 229 234;
+    --oc-border-strong: 203 209 217;
+    --oc-accent: 6 182 212;             /* cyan-500 */
+    --oc-accent-hover: 8 145 178;
+    --oc-accent-fg: 255 255 255;
+    --oc-success: 16 185 129;           /* emerald-500 */
+    --oc-warn: 234 179 8;
+    --oc-danger: 220 38 38;             /* red-600 */
+    --oc-focus-ring: 6 182 212;
+    color-scheme: light;
+  }
+  html.dark {
+    --oc-bg-page: 11 13 18;             /* near-black slate */
+    --oc-bg-surface: 18 21 28;
+    --oc-bg-elevated: 24 28 36;
+    --oc-bg-input: 18 21 28;
+    --oc-bg-hover: 32 37 47;
+    --oc-bg-muted: 28 32 41;
+    --oc-text-primary: 244 244 245;
+    --oc-text-secondary: 161 170 184;
+    --oc-text-muted: 119 130 147;
+    --oc-text-inverted: 13 17 23;
+    --oc-border-default: 39 45 56;
+    --oc-border-strong: 55 63 78;
+    --oc-accent: 34 211 238;
+    --oc-accent-hover: 6 182 212;
+    --oc-accent-fg: 13 17 23;
+    --oc-success: 52 211 153;
+    --oc-warn: 250 204 21;
+    --oc-danger: 248 113 113;
+    --oc-focus-ring: 34 211 238;
+    color-scheme: dark;
+  }
+
   html,
   body {
     @apply h-full antialiased;
   }
   body {
-    @apply bg-zinc-950 text-zinc-100;
+    background-color: rgb(var(--oc-bg-page));
+    color: rgb(var(--oc-text-primary));
     font-family:
       ui-sans-serif,
       system-ui,
@@ -17,8 +69,23 @@
       Roboto,
       sans-serif;
   }
-  html.light body {
-    @apply bg-zinc-50 text-zinc-900;
+
+  /* Visible focus ring on every interactive element, light + dark. */
+  *:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgb(var(--oc-focus-ring) / 0.6);
+    border-radius: 6px;
+  }
+
+  /* Respect reduced motion preferences. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
   }
 }
 
@@ -27,38 +94,127 @@
     @apply inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors;
   }
   .btn-primary {
-    @apply btn bg-brand-500 hover:bg-brand-400 text-zinc-900;
+    background-color: rgb(var(--oc-accent));
+    color: rgb(var(--oc-accent-fg));
+    @apply btn font-semibold;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: rgb(var(--oc-accent-hover));
+  }
+  .btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
   .btn-secondary {
-    @apply btn bg-zinc-800 hover:bg-zinc-700 text-zinc-100 border border-zinc-700;
+    background-color: rgb(var(--oc-bg-elevated));
+    color: rgb(var(--oc-text-primary));
+    border: 1px solid rgb(var(--oc-border-default));
+    @apply btn;
   }
-  html.light .btn-secondary {
-    @apply bg-white text-zinc-900 border-zinc-300 hover:bg-zinc-100;
+  .btn-secondary:hover:not(:disabled) {
+    background-color: rgb(var(--oc-bg-hover));
   }
   .btn-ghost {
-    @apply btn hover:bg-zinc-800 text-zinc-300;
+    color: rgb(var(--oc-text-secondary));
+    @apply btn;
   }
-  html.light .btn-ghost {
-    @apply hover:bg-zinc-100 text-zinc-700;
+  .btn-ghost:hover:not(:disabled) {
+    background-color: rgb(var(--oc-bg-hover));
+    color: rgb(var(--oc-text-primary));
   }
+  .btn-danger {
+    background-color: rgb(var(--oc-danger));
+    color: white;
+    @apply btn font-medium;
+  }
+  .btn-danger:hover:not(:disabled) {
+    filter: brightness(0.92);
+  }
+
   .input {
-    @apply w-full px-3 py-2 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent;
+    background-color: rgb(var(--oc-bg-input));
+    color: rgb(var(--oc-text-primary));
+    border: 1px solid rgb(var(--oc-border-default));
+    @apply w-full px-3 py-2 rounded-md transition-colors focus:outline-none;
   }
-  html.light .input {
-    @apply bg-white border-zinc-300 text-zinc-900 placeholder-zinc-400;
+  .input::placeholder {
+    color: rgb(var(--oc-text-muted));
   }
+  .input:focus {
+    box-shadow: 0 0 0 2px rgb(var(--oc-focus-ring) / 0.5);
+    border-color: rgb(var(--oc-accent));
+  }
+
   .card {
-    @apply rounded-lg border border-zinc-800 bg-zinc-900/60;
+    background-color: rgb(var(--oc-bg-surface));
+    border: 1px solid rgb(var(--oc-border-default));
+    @apply rounded-lg;
   }
-  html.light .card {
-    @apply bg-white border-zinc-200;
+
+  .surface {
+    background-color: rgb(var(--oc-bg-surface));
   }
-  html.light header,
-  html.light .text-zinc-100,
-  html.light .text-zinc-300 {
-    @apply text-zinc-900;
+  .elevated {
+    background-color: rgb(var(--oc-bg-elevated));
   }
-  html.light .border-zinc-800 {
-    @apply border-zinc-200;
+
+  .kbd {
+    @apply inline-flex items-center justify-center px-1.5 min-w-[1.5rem] h-5 rounded text-[11px] font-medium;
+    background-color: rgb(var(--oc-bg-elevated));
+    border: 1px solid rgb(var(--oc-border-default));
+    color: rgb(var(--oc-text-secondary));
   }
+
+  .chip {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium;
+    background-color: rgb(var(--oc-bg-muted));
+    color: rgb(var(--oc-text-secondary));
+    border: 1px solid rgb(var(--oc-border-default));
+  }
+  .chip-accent {
+    color: rgb(var(--oc-accent));
+    background-color: rgb(var(--oc-accent) / 0.1);
+    border-color: rgb(var(--oc-accent) / 0.25);
+  }
+  .chip-success {
+    color: rgb(var(--oc-success));
+    background-color: rgb(var(--oc-success) / 0.1);
+    border-color: rgb(var(--oc-success) / 0.3);
+  }
+  .chip-danger {
+    color: rgb(var(--oc-danger));
+    background-color: rgb(var(--oc-danger) / 0.1);
+    border-color: rgb(var(--oc-danger) / 0.3);
+  }
+}
+
+/* Remote-collaborator cursor + selection decorations rendered inside Monaco.
+ * Per-user color is injected via a <style> tag at runtime (see Editor.tsx);
+ * these rules carry the structural styling that doesn't vary. */
+.oc-collab-caret {
+  width: 2px !important;
+  margin-left: -1px;
+  pointer-events: none;
+}
+.oc-collab-selection {
+  opacity: 0.25;
+}
+.oc-collab-label {
+  position: absolute;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 14px;
+  border-radius: 3px 3px 3px 0;
+  color: #fff;
+  font-weight: 600;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  white-space: nowrap;
+  transform: translateY(-100%);
+  pointer-events: none;
+  user-select: none;
+  z-index: 5;
 }

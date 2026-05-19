@@ -52,7 +52,7 @@ interface Connected {
 
 function open(slug: string, token: string): Promise<Connected> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${baseUrl}/ws/pad/${slug}?token=${token}`);
+    const ws = new WebSocket(`${baseUrl}/ws/pad/${slug}`, [`oc.bearer.${token}`]);
     ws.binaryType = 'nodebuffer';
     const inbox: Buffer[] = [];
     const waiters: Array<{ type: number; resolve: (b: Buffer) => void; reject: (e: Error) => void; timer: NodeJS.Timeout }> = [];
@@ -165,6 +165,88 @@ describe('collab WS', () => {
     expect(file?.content).toContain('hello from alice');
 
     a.ws.close();
+    b.ws.close();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  it('broadcasts cursor presence and replays cached awareness to late joiners', async () => {
+    const tokenA = await reg('alice@p.com');
+    const { slug, fileId, padId } = await createPad(tokenA);
+    const tokenB = await reg('bob@p.com');
+    const bobUser = await prisma.user.findUnique({ where: { email: 'bob@p.com' } });
+    await prisma.padMember.create({
+      data: { padId, userId: bobUser!.id, role: 'collaborator' },
+    });
+    const tokenC = await reg('carol@p.com');
+    const carolUser = await prisma.user.findUnique({ where: { email: 'carol@p.com' } });
+    await prisma.padMember.create({
+      data: { padId, userId: carolUser!.id, role: 'collaborator' },
+    });
+
+    const a = await open(slug, tokenA);
+    const b = await open(slug, tokenB);
+    a.ws.send(encodeJSON(MSG.HELLO, { fileId }));
+    b.ws.send(encodeJSON(MSG.HELLO, { fileId }));
+    await a.next(MSG.STATE);
+    await b.next(MSG.STATE);
+
+    // Alice broadcasts cursor → Bob receives it with server-stamped identity.
+    const cursorPayload = Buffer.from(
+      JSON.stringify({ cursor: { line: 4, column: 7 } }),
+    );
+    a.ws.send(encodeBinaryWithFile(MSG.AWARENESS, fileId, cursorPayload));
+
+    const awareness = await b.next(MSG.AWARENESS);
+    const { fileId: gotFid, payload } = decodeBinaryWithFile(awareness);
+    expect(gotFid).toBe(fileId);
+    const parsed = JSON.parse(payload.toString('utf8'));
+    expect(parsed.cursor).toEqual({ line: 4, column: 7 });
+    expect(parsed.name).toBe('alice'); // server-authoritative, not spoofable
+    expect(parsed.userId).toBeTruthy();
+    expect(parsed.color).toMatch(/^#/);
+
+    // Late joiner Carol — replay should fire on HELLO so she sees Alice's cursor.
+    const c = await open(slug, tokenC);
+    c.ws.send(encodeJSON(MSG.HELLO, { fileId }));
+    // Carol should see two messages: STATE (file) then AWARENESS (Alice's cached cursor).
+    await c.next(MSG.STATE);
+    const replay = await c.next(MSG.AWARENESS, 1500);
+    const { payload: replayPayload } = decodeBinaryWithFile(replay);
+    const replayParsed = JSON.parse(replayPayload.toString('utf8'));
+    expect(replayParsed.cursor).toEqual({ line: 4, column: 7 });
+    expect(replayParsed.name).toBe('alice');
+
+    a.ws.close();
+    b.ws.close();
+    c.ws.close();
+    await new Promise((r) => setTimeout(r, 50));
+  });
+
+  it('leave broadcast uses binary frame so client can decode it', async () => {
+    const tokenA = await reg('leaver@p.com');
+    const { slug, fileId, padId } = await createPad(tokenA);
+    const tokenB = await reg('watcher@p.com');
+    const bobUser = await prisma.user.findUnique({ where: { email: 'watcher@p.com' } });
+    await prisma.padMember.create({
+      data: { padId, userId: bobUser!.id, role: 'collaborator' },
+    });
+
+    const a = await open(slug, tokenA);
+    const b = await open(slug, tokenB);
+    a.ws.send(encodeJSON(MSG.HELLO, { fileId }));
+    b.ws.send(encodeJSON(MSG.HELLO, { fileId }));
+    await a.next(MSG.STATE);
+    await b.next(MSG.STATE);
+
+    a.ws.close();
+    const leave = await b.next(MSG.AWARENESS, 1500);
+    // Must be decodable as binary-with-file (not raw JSON after type byte).
+    const { fileId: leaveFid, payload } = decodeBinaryWithFile(leave);
+    expect(leaveFid).toBe(''); // leave is fileId-agnostic
+    const parsed = JSON.parse(payload.toString('utf8'));
+    expect(parsed).toMatchObject({ type: 'leave' });
+    expect(parsed.userId).toBeTruthy();
+
     b.ws.close();
     await new Promise((r) => setTimeout(r, 50));
   });

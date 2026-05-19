@@ -23,14 +23,14 @@ export function Landing() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6">
       <div className="max-w-xl text-center space-y-6 w-full">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-400">
-          <span className="size-1.5 rounded-full bg-brand-400 animate-pulse" />
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-line text-xs text-secondary">
+          <span className="size-1.5 rounded-full bg-accent animate-pulse" />
           self-hosted · open source
         </div>
         <h1 className="text-5xl font-semibold tracking-tight">
-          Code together, <span className="text-brand-400">on your own port</span>.
+          Code together, <span className="text-accent">on your own port</span>.
         </h1>
-        <p className="text-zinc-400 leading-relaxed">
+        <p className="text-secondary leading-relaxed">
           Pick a name and start coding. No email, no password. Share the URL with your
           friends — they pick a name too and join you.
         </p>
@@ -47,7 +47,7 @@ export function Landing() {
             onChange={(e) => setName(e.target.value)}
           />
           {err && (
-            <div className="text-sm text-red-400" role="alert">
+            <div className="text-sm text-danger" role="alert">
               {err}
             </div>
           )}
@@ -56,13 +56,13 @@ export function Landing() {
           </button>
         </form>
 
-        <div className="text-xs text-zinc-500 pt-4 flex items-center justify-center gap-3">
+        <div className="text-xs text-subtle pt-4 flex items-center justify-center gap-3">
           <span>Want a recoverable account?</span>
-          <Link to="/register" className="underline hover:text-zinc-300">
+          <Link to="/register" className="underline hover:text-secondary">
             Sign up with email
           </Link>
           <span>·</span>
-          <Link to="/login" className="underline hover:text-zinc-300">
+          <Link to="/login" className="underline hover:text-secondary">
             Log in
           </Link>
         </div>

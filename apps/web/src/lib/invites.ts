@@ -35,3 +35,12 @@ export const invitesApi = {
   accept: (token: string) =>
     api.post<{ ok: true; slug: string }>(`/api/invites/${token}/accept`),
 };
+
+export const membersApi = {
+  changeRole: (slug: string, memberId: string, role: 'collaborator' | 'viewer' | 'candidate') =>
+    api.patch<{ ok: true; role: string }>(`/api/pads/${slug}/members/${memberId}`, { role }),
+  kick: (slug: string, memberId: string) =>
+    api.delete<{ ok: true }>(`/api/pads/${slug}/members/${memberId}`),
+  leave: (slug: string) =>
+    api.post<{ ok: true }>(`/api/pads/${slug}/members/leave`),
+};

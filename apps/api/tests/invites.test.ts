@@ -167,6 +167,22 @@ describe('invites', () => {
     expect(preview.json().invite.role).toBe('viewer');
   });
 
+  it('invite URL reflects request host (LAN-friendly)', async () => {
+    const lanHost = '192.168.1.50:4000';
+    const res = await server.inject({
+      method: 'POST',
+      url: `/api/pads/${slug}/share`,
+      headers: { ...auth(owner), host: lanHost },
+      payload: { role: 'collaborator' },
+    });
+    expect(res.statusCode).toBe(201);
+    const url: string = res.json().invite.url;
+    // Debug:
+    if (!url.startsWith(`http://${lanHost}/invite/`)) {
+      throw new Error(`Unexpected invite URL: ${url}`);
+    }
+  });
+
   it('lists and revokes invites', async () => {
     const a = await server.inject({
       method: 'POST',

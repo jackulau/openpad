@@ -60,12 +60,12 @@ export function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () =
         <ul className="space-y-2 text-sm">
           {SHORTCUTS.map((s, i) => (
             <li key={i} className="flex items-center justify-between gap-3">
-              <span className="text-zinc-300">{s.description}</span>
+              <span className="text-secondary">{s.description}</span>
               <span className="flex items-center gap-1">
                 {s.keys.map((k, j) => (
                   <kbd
                     key={j}
-                    className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs font-mono"
+                    className="px-2 py-0.5 rounded bg-elevated border border-strong text-xs font-mono"
                   >
                     {k}
                   </kbd>
@@ -74,8 +74,8 @@ export function ShortcutsModal({ open, onClose }: { open: boolean; onClose: () =
             </li>
           ))}
         </ul>
-        <p className="text-xs text-zinc-500">
-          Press <kbd className="px-1 bg-zinc-800 rounded">?</kbd> anywhere to toggle this panel.
+        <p className="text-xs text-subtle">
+          Press <kbd className="px-1 bg-elevated rounded">?</kbd> anywhere to toggle this panel.
         </p>
       </div>
     </div>

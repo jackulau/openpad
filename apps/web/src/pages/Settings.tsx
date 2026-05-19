@@ -63,7 +63,7 @@ export function Settings() {
     return (
       <>
         <AppHeader />
-        <main className="p-8 text-zinc-400">Not signed in.</main>
+        <main className="p-8 text-secondary">Not signed in.</main>
       </>
     );
   }
@@ -84,7 +84,7 @@ export function Settings() {
             }}
           >
             <label className="block">
-              <span className="text-sm text-zinc-400">Display name</span>
+              <span className="text-sm text-secondary">Display name</span>
               <input
                 className="input mt-1"
                 value={name}
@@ -97,7 +97,7 @@ export function Settings() {
               Save name
             </button>
           </form>
-          <p className="text-xs text-zinc-500">Email: {user.email}</p>
+          <p className="text-xs text-subtle">Email: {user.email}</p>
         </section>
 
         <section className="card p-5 space-y-4">
@@ -128,7 +128,7 @@ export function Settings() {
             }}
           >
             <label className="block">
-              <span className="text-sm text-zinc-400">Current password</span>
+              <span className="text-sm text-secondary">Current password</span>
               <input
                 type="password"
                 className="input mt-1"
@@ -138,7 +138,7 @@ export function Settings() {
               />
             </label>
             <label className="block">
-              <span className="text-sm text-zinc-400">New password</span>
+              <span className="text-sm text-secondary">New password</span>
               <input
                 type="password"
                 className="input mt-1"
@@ -159,7 +159,7 @@ export function Settings() {
 
         <section className="card p-5 space-y-4 border-red-700/40">
           <h2 className="text-lg font-semibold text-red-300">Danger zone</h2>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-secondary">
             Deleting your account removes all pads you own. Pads you only collaborated on are kept.
           </p>
           <form
@@ -176,7 +176,7 @@ export function Settings() {
             }}
           >
             <label className="block">
-              <span className="text-sm text-zinc-400">
+              <span className="text-sm text-secondary">
                 Type <code>DELETE</code> to confirm
               </span>
               <input
@@ -187,7 +187,7 @@ export function Settings() {
               />
             </label>
             <label className="block">
-              <span className="text-sm text-zinc-400">Password</span>
+              <span className="text-sm text-secondary">Password</span>
               <input
                 type="password"
                 className="input mt-1"

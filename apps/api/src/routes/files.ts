@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { canEdit, canManage, getPadAccess } from '../lib/permissions.js';
-import { langForFile, resolveLanguage } from '@opencoder/shared';
+import { langForFile, resolveLanguage, templateFor } from '@opencoder/shared';
 
 const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
 
@@ -94,6 +94,75 @@ export async function registerFileRoutes(server: FastifyInstance): Promise<void>
       if (parsed.data.sortOrder != null) data.sortOrder = parsed.data.sortOrder;
       const updated = await prisma.padFile.update({ where: { id: fileId }, data });
       return { file: shape(updated) };
+    },
+  );
+
+  // Relanguage a file: rename it to the new language's default filename and
+  // swap its contents to the matching template *only if* the current content
+  // matches a known template (i.e. the user hasn't actually typed real code).
+  // Otherwise just rename + change the language column so the user's work is
+  // preserved. Also moves Yjs state forward by clearing yjsState — the editor
+  // will reseed from `content` on next mount.
+  server.patch(
+    '/:slug/files/:fileId/relanguage',
+    { preHandler: server.requireAuth },
+    async (req, reply) => {
+      const { slug, fileId } = req.params as { slug: string; fileId: string };
+      const userId = req.currentUser!.sub;
+      const access = await getPadAccess(slug, userId);
+      if (!access) return reply.code(404).send({ error: 'not_found' });
+      if (!canEdit(access.role)) return reply.code(403).send({ error: 'forbidden' });
+      const parsed = z
+        .object({ language: z.string().refine(validLanguage, 'unknown_language') })
+        .safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+      }
+      const existing = await prisma.padFile.findUnique({ where: { id: fileId } });
+      if (!existing || existing.padId !== access.pad.id) {
+        return reply.code(404).send({ error: 'not_found' });
+      }
+      const newSpec = resolveLanguage(parsed.data.language)!;
+      const ext = newSpec.fileExt ?? '.txt';
+      const baseName =
+        ext === '.java' ? 'Main.java' : ext === '.hs' ? 'Main.hs' : `main${ext}`;
+      // Avoid colliding with another file in this pad.
+      let name = baseName;
+      for (let i = 2; i < 50; i++) {
+        const conflict = await prisma.padFile.findFirst({
+          where: { padId: access.pad.id, name, NOT: { id: fileId } },
+        });
+        if (!conflict) break;
+        const dot = baseName.lastIndexOf('.');
+        name = dot > 0 ? `${baseName.slice(0, dot)}-${i}${baseName.slice(dot)}` : `${baseName}-${i}`;
+      }
+      // Decide whether to overwrite content. We replace only when the existing
+      // content equals one of the known templates for the *old* language — that
+      // way someone who hasn't edited the file gets a fresh starter, and someone
+      // mid-implementation keeps their work.
+      const helloOld = templateFor(existing.language, 'hello');
+      const leetOld = templateFor(existing.language, 'leetcode');
+      const currentContent = existing.content ?? '';
+      const isPristine =
+        currentContent === '' || currentContent === helloOld || currentContent === leetOld;
+      const newContent = isPristine
+        ? templateFor(parsed.data.language, 'hello')
+        : currentContent;
+      const updated = await prisma.padFile.update({
+        where: { id: fileId },
+        data: {
+          name,
+          language: parsed.data.language,
+          content: newContent,
+          // Drop the Yjs binary state so the editor re-seeds from `content`.
+          // Clients re-open their Y.Doc against the new file id (same id, fresh state).
+          yjsState: null,
+        },
+      });
+      return {
+        file: shape(updated),
+        contentReplaced: isPristine,
+      };
     },
   );
 

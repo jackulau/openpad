@@ -40,7 +40,7 @@ interface ConnHelper {
 }
 function open(slug: string, token: string): Promise<ConnHelper> {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${baseUrl}/ws/pad/${slug}?token=${token}`);
+    const ws = new WebSocket(`${baseUrl}/ws/pad/${slug}`, [`oc.bearer.${token}`]);
     ws.binaryType = 'nodebuffer';
     const inbox: Buffer[] = [];
     const waiters: Array<{ type: number; res: (b: Buffer) => void; rej: (e: Error) => void; timer: NodeJS.Timeout }> = [];

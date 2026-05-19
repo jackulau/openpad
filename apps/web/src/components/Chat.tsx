@@ -39,13 +39,13 @@ export function Chat({ slug, client, myUserId }: Props) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="border-b border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-wide text-zinc-500">
+      <div className="border-b border-line px-3 py-1.5 text-xs uppercase tracking-wide text-subtle">
         Chat
       </div>
       <div ref={scrollerRef} className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
-        {history.isLoading && <div className="text-zinc-500">loading…</div>}
+        {history.isLoading && <div className="text-subtle">loading…</div>}
         {all.length === 0 && !history.isLoading && (
-          <div className="text-zinc-500">No messages yet. Say hi.</div>
+          <div className="text-subtle">No messages yet. Say hi.</div>
         )}
         {all.map((m, i) => {
           const mine = m.userId === myUserId;
@@ -56,19 +56,19 @@ export function Chat({ slug, client, myUserId }: Props) {
           return (
             <div key={m.id ?? `${m.createdAt}-${i}`} className="text-sm">
               {showHeader && (
-                <div className="text-xs text-zinc-500 flex items-center gap-1 mt-2">
-                  <span className={mine ? 'text-brand-400' : 'text-zinc-300'}>{m.userName}</span>
+                <div className="text-xs text-subtle flex items-center gap-1 mt-2">
+                  <span className={mine ? 'text-accent' : 'text-secondary'}>{m.userName}</span>
                   <span>·</span>
                   <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
                 </div>
               )}
-              <div className="text-zinc-100 whitespace-pre-wrap break-words">{m.body}</div>
+              <div className="text-primary whitespace-pre-wrap break-words">{m.body}</div>
             </div>
           );
         })}
       </div>
       <form
-        className="border-t border-zinc-800 p-2 flex gap-2"
+        className="border-t border-line p-2 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           const body = draft.trim();

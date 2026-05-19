@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { canManage, canView, getPadAccess } from '../lib/permissions.js';
 import { generateSlug } from '../lib/slug.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { recordAudit } from '../lib/audit.js';
 import { langForFile, resolveLanguage } from '@opencoder/shared';
 
 const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
@@ -30,6 +31,7 @@ function summarize(
     kind: string;
     ownerId: string;
     passwordHash?: string | null;
+    autoRecord?: boolean;
     updatedAt: Date;
     createdAt: Date;
   },
@@ -43,6 +45,7 @@ function summarize(
     kind: pad.kind,
     ownerId: pad.ownerId,
     hasPassword: !!pad.passwordHash,
+    autoRecord: pad.autoRecord ?? false,
     updatedAt: pad.updatedAt.toISOString(),
     createdAt: pad.createdAt.toISOString(),
     myRole,
@@ -115,8 +118,11 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     if (!access || !canView(access.role)) return reply.code(404).send({ error: 'not_found' });
 
     const [files, members] = await Promise.all([
+      // Whiteboard lives as a synthetic PadFile keyed by language="whiteboard".
+      // Hide it from the regular files tree — the dedicated /whiteboard route
+      // is how clients discover it.
       prisma.padFile.findMany({
-        where: { padId: access.pad.id },
+        where: { padId: access.pad.id, NOT: { language: 'whiteboard' } },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         select: {
           id: true,
@@ -209,6 +215,13 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     };
     if (parsed.data.role) data.passwordRole = parsed.data.role;
     await prisma.pad.update({ where: { id: access.pad.id }, data });
+    recordAudit({
+      action: data.passwordHash ? 'pad.password.set' : 'pad.password.clear',
+      userId,
+      target: slug,
+      req,
+      meta: { role: parsed.data.role },
+    });
     return { ok: true, hasPassword: !!data.passwordHash };
   });
 
@@ -275,6 +288,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
         },
       },
     });
+    recordAudit({ action: 'pad.fork', userId, target: newSlug, req, meta: { from: slug } });
     return reply.code(201).send({ pad: summarize(fork, 'owner') });
   });
 
@@ -312,6 +326,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     if (!access) return reply.code(404).send({ error: 'not_found' });
     if (!canManage(access.role)) return reply.code(403).send({ error: 'forbidden' });
     await prisma.pad.delete({ where: { id: access.pad.id } });
+    recordAudit({ action: 'pad.delete', userId, target: slug, req });
     return reply.send({ ok: true });
   });
 }

@@ -359,6 +359,8 @@ export function Pad() {
                     setLanguage(f.language);
                   }}
                   canEdit={editAllowed}
+                  presence={presence}
+                  myUserId={user?.id ?? null}
                 />
               </div>
             )}
