@@ -4,7 +4,7 @@ import { prisma } from '../db.js';
 import { canManage, canView, getPadAccess } from '../lib/permissions.js';
 import { generateSlug } from '../lib/slug.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
-import { LANGUAGES, langForFile, resolveLanguage } from '@opencoder/shared';
+import { langForFile, resolveLanguage } from '@opencoder/shared';
 
 const validLanguage = (v: string): boolean => resolveLanguage(v) !== undefined;
 
