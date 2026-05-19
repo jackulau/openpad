@@ -109,6 +109,34 @@ describe('playback', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it('surfaces terminal events in the timeline with utf8 payload', async () => {
+    const user = await prisma.user.findUnique({ where: { email: 'play@b.com' } });
+    const frags = [
+      { s: 'i', d: 'echo hi\n', t: Date.now() - 100 },
+      { s: 'o', d: 'hi\n', t: Date.now() - 50 },
+    ];
+    await prisma.editEvent.create({
+      data: {
+        padId,
+        kind: 'terminal',
+        userId: user!.id,
+        payload: Buffer.from(JSON.stringify(frags)),
+      },
+    });
+    const res = await server.inject({
+      method: 'GET',
+      url: `/api/pads/${slug}/playback`,
+      headers: auth(token),
+    });
+    const body = res.json();
+    const term = body.events.find((e: { kind: string }) => e.kind === 'terminal');
+    expect(term).toBeDefined();
+    expect(term.payload).toBeTruthy();
+    const parsed = JSON.parse(term.payload) as Array<{ s: string; d: string }>;
+    expect(parsed.map((f) => f.s)).toEqual(['i', 'o']);
+    expect(parsed.map((f) => f.d).join('')).toBe('echo hi\nhi\n');
+  });
+
   it('reconstructs document by applying yjs updates', async () => {
     // simulate edits
     const doc = new Y.Doc();

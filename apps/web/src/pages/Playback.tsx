@@ -9,11 +9,18 @@ import { api } from '../lib/api';
 interface PlaybackEvent {
   id: string;
   ts: number;
-  kind: 'yjs' | 'run' | 'chat' | 'snapshot' | 'file';
+  kind: 'yjs' | 'run' | 'chat' | 'snapshot' | 'file' | 'terminal';
   fileId: string | null;
   userId: string | null;
   userName: string | null;
   payload?: string;
+  meta?: { truncated?: boolean };
+}
+
+interface TermFragment {
+  s: 'i' | 'o';
+  d: string;
+  t: number;
 }
 
 interface Timeline {
@@ -78,8 +85,9 @@ export function Playback() {
     };
   }, [playing, speed, max, events, scrubIndex]);
 
-  const { sourceText, runEvents, chatEvents } = useMemo(() => {
-    if (!tl.data || !activeFileId) return { sourceText: '', runEvents: [], chatEvents: [] };
+  const { sourceText, runEvents, chatEvents, terminalEvents } = useMemo(() => {
+    if (!tl.data || !activeFileId)
+      return { sourceText: '', runEvents: [], chatEvents: [], terminalEvents: [] };
     const doc = new Y.Doc();
     const upTo = events.slice(0, scrubIndex);
     for (const e of upTo) {
@@ -95,13 +103,14 @@ export function Playback() {
       sourceText: doc.getText('content').toString(),
       runEvents: upTo.filter((e) => e.kind === 'run'),
       chatEvents: upTo.filter((e) => e.kind === 'chat'),
+      terminalEvents: upTo.filter((e) => e.kind === 'terminal'),
     };
   }, [tl.data, activeFileId, scrubIndex, events]);
 
-  if (tl.isLoading) return <div className="p-8 text-zinc-400">loading playback…</div>;
+  if (tl.isLoading) return <div className="p-8 text-secondary">loading playback…</div>;
   if (tl.isError)
     return (
-      <div className="p-8 text-red-400">
+      <div className="p-8 text-danger">
         Couldn't load playback. <Link to="/dashboard" className="underline">Back</Link>
       </div>
     );
@@ -114,25 +123,25 @@ export function Playback() {
   return (
     <div className="h-screen flex flex-col">
       <AppHeader />
-      <div className="border-b border-zinc-800 px-4 py-2 flex items-center gap-3">
+      <div className="border-b border-line px-4 py-2 flex items-center gap-3">
         <h2 className="font-medium text-sm">Playback</h2>
         {recording && (
           <span className="text-xs px-2 py-0.5 rounded bg-brand-900/40 text-brand-300 border border-brand-800">
             recording window
           </span>
         )}
-        <Link to={`/p/${slug}`} className="text-xs text-brand-400 underline">
+        <Link to={`/p/${slug}`} className="text-xs text-accent underline">
           back to pad
         </Link>
       </div>
       <div className="flex-1 grid grid-cols-[180px_1fr_320px]">
-        <aside className="border-r border-zinc-800 p-2">
-          <div className="text-xs uppercase tracking-wide text-zinc-500 px-2 mb-1">Files</div>
+        <aside className="border-r border-line p-2">
+          <div className="text-xs uppercase tracking-wide text-subtle px-2 mb-1">Files</div>
           {tl.data.files.map((f) => (
             <button
               key={f.id}
               className={`block w-full text-left px-2 py-1 rounded text-sm ${
-                f.id === activeFileId ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-900'
+                f.id === activeFileId ? 'bg-elevated text-primary' : 'text-secondary hover:bg-surface'
               }`}
               onClick={() => setActiveFileId(f.id)}
             >
@@ -148,7 +157,7 @@ export function Playback() {
               language={activeFile?.language ?? 'plaintext'}
             />
           </div>
-          <div className="border-t border-zinc-800 p-3 space-y-2">
+          <div className="border-t border-line p-3 space-y-2">
             <div className="flex items-center gap-3">
               <button
                 className="btn-secondary !py-1"
@@ -168,7 +177,7 @@ export function Playback() {
                   </option>
                 ))}
               </select>
-              <span className="text-xs text-zinc-500">
+              <span className="text-xs text-subtle">
                 {scrubIndex} / {max} · {currentTime}
               </span>
             </div>
@@ -185,14 +194,14 @@ export function Playback() {
             />
           </div>
         </main>
-        <aside className="border-l border-zinc-800 min-w-0 flex flex-col">
-          <div className="border-b border-zinc-800 px-3 py-1.5 text-xs uppercase tracking-wide text-zinc-500">
+        <aside className="border-l border-line min-w-0 flex flex-col">
+          <div className="border-b border-line px-3 py-1.5 text-xs uppercase tracking-wide text-subtle">
             Events
           </div>
           <div className="overflow-y-auto p-3 text-xs space-y-2">
             {chatEvents.map((c) => (
-              <div key={c.id} className="text-zinc-300">
-                <span className="text-zinc-500">[chat]</span> <strong>{c.userName ?? '?'}:</strong>{' '}
+              <div key={c.id} className="text-secondary">
+                <span className="text-subtle">[chat]</span> <strong>{c.userName ?? '?'}:</strong>{' '}
                 {c.payload}
               </div>
             ))}
@@ -204,13 +213,34 @@ export function Playback() {
                 /* ignore */
               }
               return (
-                <div key={r.id} className="text-zinc-300">
-                  <span className="text-zinc-500">[run]</span>{' '}
-                  <span className="text-brand-400">{meta.language}</span>{' '}
+                <div key={r.id} className="text-secondary">
+                  <span className="text-subtle">[run]</span>{' '}
+                  <span className="text-accent">{meta.language}</span>{' '}
                   exit {meta.exitCode ?? '?'}
                 </div>
               );
             })}
+            {terminalEvents.length > 0 && (
+              <div className="border-t border-line pt-2 mt-2">
+                <div className="text-subtle uppercase tracking-wide mb-1">terminal</div>
+                <pre className="font-mono text-[11px] leading-tight whitespace-pre-wrap break-all text-secondary">
+                  {terminalEvents
+                    .flatMap((e) => {
+                      let frags: TermFragment[] = [];
+                      try {
+                        frags = JSON.parse(e.payload ?? '[]') as TermFragment[];
+                      } catch {
+                        /* ignore */
+                      }
+                      return frags.map((f) => (f.s === 'i' ? f.d : f.d));
+                    })
+                    .join('')}
+                  {terminalEvents.some((e) => e.meta?.truncated) && (
+                    <span className="text-danger">[truncated]</span>
+                  )}
+                </pre>
+              </div>
+            )}
           </div>
         </aside>
       </div>

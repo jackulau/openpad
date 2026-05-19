@@ -3,11 +3,11 @@ import { prisma } from '../db.js';
 export interface PlaybackEvent {
   id: string;
   ts: number;
-  kind: 'yjs' | 'run' | 'chat' | 'snapshot' | 'file';
+  kind: 'yjs' | 'run' | 'chat' | 'snapshot' | 'file' | 'terminal';
   fileId: string | null;
   userId: string | null;
   userName: string | null;
-  /** Base64 of the binary payload for yjs/snapshot; JSON-text for run; chat is plain text body. */
+  /** Base64 of the binary payload for yjs/snapshot; JSON-text for run/terminal; chat is plain text body. */
   payload?: string;
   meta?: Record<string, unknown>;
 }
@@ -20,7 +20,18 @@ export interface PlaybackTimeline {
   endedAt: string;
 }
 
-export async function buildTimeline(padId: string): Promise<PlaybackTimeline> {
+export interface TimelineOptions {
+  /** Inclusive lower bound for event createdAt. */
+  from?: Date;
+  /** Inclusive upper bound for event createdAt. */
+  to?: Date;
+}
+
+export async function buildTimeline(
+  padId: string,
+  opts: TimelineOptions = {},
+): Promise<PlaybackTimeline> {
+  const range = opts.from || opts.to ? buildRange(opts) : {};
   const [pad, files, edits, chats] = await Promise.all([
     prisma.pad.findUnique({ where: { id: padId } }),
     prisma.padFile.findMany({
@@ -29,12 +40,12 @@ export async function buildTimeline(padId: string): Promise<PlaybackTimeline> {
       orderBy: { sortOrder: 'asc' },
     }),
     prisma.editEvent.findMany({
-      where: { padId },
+      where: { padId, ...(range.createdAt ? { createdAt: range.createdAt } : {}) },
       orderBy: { createdAt: 'asc' },
       include: { user: { select: { id: true, name: true } } },
     }),
     prisma.chatMessage.findMany({
-      where: { padId },
+      where: { padId, ...(range.createdAt ? { createdAt: range.createdAt } : {}) },
       orderBy: { createdAt: 'asc' },
       include: { user: { select: { id: true, name: true } } },
     }),
@@ -62,7 +73,7 @@ export async function buildTimeline(padId: string): Promise<PlaybackTimeline> {
     let payload: string | undefined;
     if (e.kind === 'yjs' || e.kind === 'snapshot') {
       payload = Buffer.from(e.payload).toString('base64');
-    } else if (e.kind === 'run') {
+    } else if (e.kind === 'run' || e.kind === 'terminal') {
       payload = e.payload.toString('utf8');
     }
     events.push({
@@ -103,4 +114,13 @@ export async function buildTimeline(padId: string): Promise<PlaybackTimeline> {
     startedAt,
     endedAt,
   };
+}
+
+function buildRange(
+  opts: TimelineOptions,
+): { createdAt?: { gte?: Date; lte?: Date } } {
+  const createdAt: { gte?: Date; lte?: Date } = {};
+  if (opts.from) createdAt.gte = opts.from;
+  if (opts.to) createdAt.lte = opts.to;
+  return { createdAt };
 }

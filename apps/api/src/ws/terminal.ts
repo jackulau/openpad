@@ -2,6 +2,7 @@ import type { WebSocket } from 'ws';
 import type { JwtPayload } from '../lib/auth.js';
 import { canEdit, getPadAccess } from '../lib/permissions.js';
 import { env } from '../env.js';
+import { TerminalCapture } from '../services/terminalCapture.js';
 
 // Lazy import — node-pty is a native module that may fail to build on some hosts.
 type IPty = {
@@ -66,6 +67,7 @@ export async function handleTerminalConn({
     ws.close(4003, 'forbidden');
     return;
   }
+  const capture = new TerminalCapture(access.pad.id, user.sub);
   const mod = await getNodePty();
   if (!mod) {
     send(ws, 'error', {
@@ -118,6 +120,7 @@ export async function handleTerminalConn({
 
   pty.onData((data) => {
     resetIdle();
+    capture.recordOutput(data);
     send(ws, 'output', { data });
   });
   pty.onExit((e) => {
@@ -134,6 +137,7 @@ export async function handleTerminalConn({
     }
     resetIdle();
     if (msg.type === 'input' && typeof msg.data === 'string') {
+      capture.recordInput(msg.data);
       pty.write(msg.data);
     } else if (msg.type === 'resize' && msg.cols && msg.rows) {
       try {
@@ -148,6 +152,7 @@ export async function handleTerminalConn({
 
   ws.on('close', () => {
     if (idleTimer) clearTimeout(idleTimer);
+    void capture.close();
     try {
       pty.kill();
     } catch {
