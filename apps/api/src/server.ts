@@ -185,18 +185,26 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
 
 async function maybeRegisterStaticWeb(server: FastifyInstance): Promise<void> {
   const here = path.dirname(fileURLToPath(import.meta.url));
-  // try common locations: bundled docker layout + dev layout
+  // try common locations for the built SPA:
+  //   - docker image layout (web-dist next to api dist)
+  //   - dev via tsx (apps/api/src → ../../web/dist)
+  //   - dev via compiled output (apps/api/dist/src → ../../../web/dist)
+  //   - monorepo from root (.../apps/web/dist)
   const candidates = [
-    path.resolve(here, '..', '..', '..', 'web-dist'), // docker layout
-    path.resolve(here, '..', '..', '..', 'web', 'dist'), // monorepo dev
+    path.resolve(here, '..', '..', '..', 'web-dist'),
+    path.resolve(here, '..', '..', 'web', 'dist'),
+    path.resolve(here, '..', '..', '..', 'web', 'dist'),
     path.resolve(here, '..', '..', '..', '..', 'apps', 'web', 'dist'),
+    path.resolve(here, '..', '..', '..', 'apps', 'web', 'dist'),
   ];
   const root = candidates.find((p) => existsSync(p));
   if (!root) return;
   await server.register(staticPlugin, {
     root,
     prefix: '/',
-    decorateReply: false,
+    // decorateReply must be true so the SPA-fallback handler below can call
+    // reply.sendFile('index.html') without crashing.
+    decorateReply: true,
   });
   server.setNotFoundHandler(async (req, reply) => {
     if (req.url.startsWith('/api/') || req.url.startsWith('/ws/') || req.url.startsWith('/health')) {

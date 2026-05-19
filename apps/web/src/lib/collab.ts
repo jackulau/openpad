@@ -139,6 +139,18 @@ export class CollabClient {
         this.ws?.send(encodeJSON(MSG.HELLO, { fileId }));
       }
       this.pendingHello = [];
+      // Re-broadcast our presence so peers see us after a reconnect (and so
+      // the server's per-pad cache gets repopulated for any late joiners).
+      if (this.currentSelfPresence.userId) {
+        const fileId = this.currentSelfPresence.fileId ?? '';
+        this.ws?.send(
+          encodeBinaryWithFile(
+            MSG.AWARENESS,
+            fileId,
+            new TextEncoder().encode(JSON.stringify(this.currentSelfPresence)),
+          ),
+        );
+      }
     };
 
     this.ws.onmessage = (e: MessageEvent) => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CollabClient, type CollabStatus, type PresenceUser } from './collab';
 import { getToken } from './api';
 import { useAuth } from './authStore';
@@ -12,11 +12,13 @@ export function useCollab(slug: string | undefined): {
   const token = getToken();
   const myId = useAuth((s) => s.user?.id);
   const pushToast = useToasts((s) => s.push);
-  const client = useMemo(() => {
-    if (!slug || !token) return null;
-    return new CollabClient(slug, token);
-  }, [slug, token]);
 
+  // CollabClient owns a WebSocket, so we create + tear it down inside the
+  // effect (not in useMemo). React 18 StrictMode mounts effects twice in dev,
+  // and a useMemo'd client would survive the first cleanup with a closed
+  // socket — leaving the UI permanently stuck at "closed". Doing it here lets
+  // the second mount instantiate a fresh client cleanly.
+  const [client, setClient] = useState<CollabClient | null>(null);
   const [status, setStatus] = useState<CollabStatus>('connecting');
   const [presence, setPresence] = useState<Record<string, PresenceUser>>({});
 
@@ -24,15 +26,29 @@ export function useCollab(slug: string | undefined): {
   // snapshot so users don't see "Alice joined" for everyone already in the pad
   // when they themselves connect.
   const seenIds = useRef<Set<string> | null>(null);
+  const presenceRef = useRef<Record<string, PresenceUser>>({});
 
   useEffect(() => {
-    if (!client) return;
-    const u1 = client.onStatus(setStatus);
-    const u2 = client.onPresence((next) => {
+    if (!slug || !token) {
+      setClient(null);
+      setStatus('closed');
+      setPresence({});
+      return;
+    }
+    const c = new CollabClient(slug, token);
+    setClient(c);
+    setStatus('connecting');
+    setPresence({});
+    presenceRef.current = {};
+    seenIds.current = null;
+
+    const u1 = c.onStatus(setStatus);
+    const u2 = c.onPresence((next) => {
       setPresence(next);
       const nextIds = new Set(Object.keys(next));
       if (seenIds.current === null) {
         seenIds.current = nextIds;
+        presenceRef.current = next;
         return;
       }
       const prev = seenIds.current;
@@ -43,20 +59,21 @@ export function useCollab(slug: string | undefined): {
       }
       for (const id of prev) {
         if (!nextIds.has(id) && id !== myId) {
-          const leaver = presence[id] ?? next[id];
+          const leaver = presenceRef.current[id] ?? next[id];
           pushToast(`${leaver?.name ?? 'Someone'} left`, 'info');
         }
       }
       seenIds.current = nextIds;
+      presenceRef.current = next;
     });
     return () => {
       u1();
       u2();
-      client.close();
+      c.close();
       seenIds.current = null;
     };
-    // myId/pushToast are stable refs (zustand selectors); intentionally not in deps.
-  }, [client]);
+    // myId/pushToast come from stable zustand selectors; intentionally omitted.
+  }, [slug, token]);
 
   return { client, status, presence };
 }

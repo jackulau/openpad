@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { prisma } from '../db.js';
 import { canManage, getPadAccess, type Role } from '../lib/permissions.js';
 import { randomToken } from '../lib/slug.js';
-import { env } from '../env.js';
 import { recordAudit } from '../lib/audit.js';
 
 const roleEnum = z.enum(['collaborator', 'viewer', 'candidate']);
@@ -21,17 +20,28 @@ const shareBody = z.object({
 
 const DEFAULT_PUBLIC_BASE = 'http://localhost:4000';
 
-// Pick the base URL for invite links. Env override wins (operator-set), else
-// reflect the request host so LAN deployments work without configuration —
-// the friend gets `http://192.168.1.x:4000/invite/...` instead of localhost.
+// Pick the base URL for invite links.
+//
+// Priority:
+//   1. Explicit PUBLIC_BASE_URL env override (non-default) — operator-canonical
+//      URL, e.g. behind a fixed reverse-proxy hostname.
+//   2. Request host (with x-forwarded-host honored under trustProxy) — so a
+//      friend who opens the app at http://192.168.1.x:4000 gets an invite link
+//      pointed at the same LAN IP. Zero-config for LAN.
+//   3. Fall back to the env default.
+//
+// Reads process.env each call rather than the frozen env module so deploys
+// that mutate it post-boot, and tests that stub it, both work.
 function baseUrlFor(req: FastifyRequest): string {
-  const fromEnv = env.PUBLIC_BASE_URL.replace(/\/$/, '');
-  if (fromEnv && fromEnv !== DEFAULT_PUBLIC_BASE) return fromEnv;
+  const raw = (process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
+  if (raw && raw !== DEFAULT_PUBLIC_BASE) return raw;
   const host = (req.headers['x-forwarded-host'] as string | undefined) ?? req.headers.host;
-  if (!host) return fromEnv;
-  const proto =
-    (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol ?? 'http';
-  return `${proto}://${host}`;
+  if (host) {
+    const proto =
+      (req.headers['x-forwarded-proto'] as string | undefined) ?? req.protocol ?? 'http';
+    return `${proto}://${host}`;
+  }
+  return raw || DEFAULT_PUBLIC_BASE;
 }
 
 function inviteUrl(req: FastifyRequest, token: string): string {

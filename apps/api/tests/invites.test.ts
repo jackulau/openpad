@@ -167,19 +167,41 @@ describe('invites', () => {
     expect(preview.json().invite.role).toBe('viewer');
   });
 
-  it('invite URL reflects request host (LAN-friendly)', async () => {
+  it('invite URL reflects request host when env override is at default', async () => {
     const lanHost = '192.168.1.50:4000';
-    const res = await server.inject({
-      method: 'POST',
-      url: `/api/pads/${slug}/share`,
-      headers: { ...auth(owner), host: lanHost },
-      payload: { role: 'collaborator' },
-    });
-    expect(res.statusCode).toBe(201);
-    const url: string = res.json().invite.url;
-    // Debug:
-    if (!url.startsWith(`http://${lanHost}/invite/`)) {
-      throw new Error(`Unexpected invite URL: ${url}`);
+    const prev = process.env.PUBLIC_BASE_URL;
+    process.env.PUBLIC_BASE_URL = 'http://localhost:4000';
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/pads/${slug}/share`,
+        headers: { ...auth(owner), host: lanHost },
+        payload: { role: 'collaborator' },
+      });
+      expect(res.statusCode).toBe(201);
+      const url: string = res.json().invite.url;
+      expect(url.startsWith(`http://${lanHost}/invite/`)).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.PUBLIC_BASE_URL;
+      else process.env.PUBLIC_BASE_URL = prev;
+    }
+  });
+
+  it('explicit PUBLIC_BASE_URL env override wins over request host', async () => {
+    const prev = process.env.PUBLIC_BASE_URL;
+    process.env.PUBLIC_BASE_URL = 'https://canonical.example.com';
+    try {
+      const res = await server.inject({
+        method: 'POST',
+        url: `/api/pads/${slug}/share`,
+        headers: { ...auth(owner), host: '192.168.1.99:4000' },
+        payload: { role: 'collaborator' },
+      });
+      const url: string = res.json().invite.url;
+      expect(url.startsWith('https://canonical.example.com/invite/')).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.PUBLIC_BASE_URL;
+      else process.env.PUBLIC_BASE_URL = prev;
     }
   });
 
