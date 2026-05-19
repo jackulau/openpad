@@ -1,0 +1,189 @@
+import { WebSocket } from 'ws';
+import {
+  MSG,
+  decodeBinaryWithFile,
+  decodeJSON,
+  encodeBinaryWithFile,
+  encodeJSON,
+  messageType,
+  type MsgType,
+} from './protocol.js';
+import {
+  addConn,
+  applyUpdate,
+  broadcast,
+  ensureFile,
+  getStateAsUpdate,
+  removeConn,
+  type PadConn,
+} from './hub.js';
+import { prisma } from '../db.js';
+import { canEdit, canView, getPadAccess } from '../lib/permissions.js';
+
+const PRESENCE_BY_CONN = new WeakMap<WebSocket, Record<string, unknown>>();
+
+const COLORS = [
+  '#f97316',
+  '#22d3ee',
+  '#a78bfa',
+  '#34d399',
+  '#fb7185',
+  '#facc15',
+  '#60a5fa',
+  '#f472b6',
+];
+
+function colorFor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return COLORS[h % COLORS.length];
+}
+
+export interface HandleOptions {
+  ws: WebSocket;
+  slug: string;
+  user: { sub: string; email: string; name: string };
+}
+
+export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promise<void> {
+  // Attach message handler immediately to avoid losing messages
+  // that arrive while we resolve pad access asynchronously.
+  const pending: Buffer[] = [];
+  let access: Awaited<ReturnType<typeof getPadAccess>> = null;
+  const conn: PadConn = {
+    ws,
+    userId: user.sub,
+    userName: user.name,
+    padId: '',
+    color: colorFor(user.sub),
+    alive: true,
+  };
+
+  const earlyListener = (raw: Buffer): void => {
+    pending.push(raw);
+  };
+  ws.on('message', earlyListener);
+
+  access = await getPadAccess(slug, user.sub);
+  if (!access || !canView(access.role)) {
+    ws.send(encodeJSON(MSG.ERROR, { error: 'not_found' }));
+    ws.close(4004, 'not_found');
+    return;
+  }
+  conn.padId = access.pad.id;
+  addConn(conn);
+  ws.removeListener('message', earlyListener);
+
+  ws.on('pong', () => {
+    conn.alive = true;
+  });
+  const keepalive = setInterval(() => {
+    if (!conn.alive) {
+      ws.terminate();
+      clearInterval(keepalive);
+      return;
+    }
+    conn.alive = false;
+    try {
+      ws.ping();
+    } catch {
+      /* ignore */
+    }
+  }, 30_000);
+
+  const onMessage = async (raw: Buffer): Promise<void> => {
+    const type = messageType(raw) as MsgType;
+    try {
+      if (type === MSG.HELLO) {
+        const hello = decodeJSON<{ fileId?: string }>(raw);
+        if (hello.fileId) {
+          const file = await prisma.padFile.findUnique({ where: { id: hello.fileId } });
+          if (!file || file.padId !== access.pad.id) {
+            ws.send(encodeJSON(MSG.ERROR, { error: 'file_not_found' }));
+            return;
+          }
+          const state = await ensureFile(access.pad.id, hello.fileId);
+          ws.send(encodeBinaryWithFile(MSG.STATE, hello.fileId, getStateAsUpdate(state.doc)));
+        }
+        return;
+      }
+      if (type === MSG.UPDATE) {
+        if (!canEdit(access.role)) return; // viewers can't edit
+        const { fileId, payload } = decodeBinaryWithFile(raw);
+        await ensureFile(access.pad.id, fileId);
+        applyUpdate(access.pad.id, fileId, new Uint8Array(payload));
+        // persist the raw incremental update for playback
+        prisma.editEvent
+          .create({
+            data: {
+              padId: access.pad.id,
+              fileId,
+              kind: 'yjs',
+              userId: user.sub,
+              payload: Buffer.from(payload),
+            },
+          })
+          .catch(() => {});
+        broadcast(access.pad.id, ws, encodeBinaryWithFile(MSG.UPDATE, fileId, payload));
+        return;
+      }
+      if (type === MSG.AWARENESS) {
+        const { fileId, payload } = decodeBinaryWithFile(raw);
+        try {
+          const parsed = JSON.parse(payload.toString('utf8'));
+          PRESENCE_BY_CONN.set(ws, {
+            ...parsed,
+            userId: user.sub,
+            name: user.name,
+            color: conn.color,
+            fileId,
+          });
+        } catch {
+          /* ignore */
+        }
+        broadcast(access.pad.id, ws, encodeBinaryWithFile(MSG.AWARENESS, fileId, payload));
+        return;
+      }
+      if (type === MSG.PING) {
+        ws.send(encodeJSON(MSG.PONG, {}));
+        return;
+      }
+      if (type === MSG.CHAT) {
+        await handleChat({ ws, conn, raw });
+        return;
+      }
+    } catch (err) {
+      ws.send(encodeJSON(MSG.ERROR, { error: 'bad_message', message: String((err as Error).message) }));
+    }
+  };
+  ws.on('message', (raw: Buffer) => {
+    void onMessage(raw);
+  });
+  // Drain any messages that arrived during async setup.
+  for (const raw of pending) void onMessage(raw);
+  pending.length = 0;
+
+  ws.on('close', () => {
+    clearInterval(keepalive);
+    removeConn(conn);
+    broadcast(
+      access.pad.id,
+      null,
+      encodeJSON(MSG.AWARENESS, { type: 'leave', userId: user.sub }),
+    );
+  });
+}
+
+async function handleChat({
+  ws,
+  conn,
+  raw,
+}: {
+  ws: WebSocket;
+  conn: PadConn;
+  raw: Buffer;
+}): Promise<void> {
+  // Lazy require to avoid circular import.
+  const { handleChatMessage } = await import('./chat.js');
+  await handleChatMessage({ ws, conn, raw });
+}
