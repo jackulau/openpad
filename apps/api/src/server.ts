@@ -8,6 +8,7 @@ import { env } from './env.js';
 import { authPlugin } from './plugins/auth.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPadRoutes } from './routes/pads.js';
+import { registerExecRoutes } from './routes/exec.js';
 
 export type AppServer = FastifyInstance;
 
@@ -49,6 +50,7 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
 
   await server.register(registerAuthRoutes, { prefix: '/api/auth' });
   await server.register(registerPadRoutes, { prefix: '/api/pads' });
+  await server.register(registerExecRoutes, { prefix: '/api/pads' });
 
   return server;
 }
