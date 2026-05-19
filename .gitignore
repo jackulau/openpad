@@ -8,3 +8,10 @@ dist/
 /data/
 /apps/*/dist
 /apps/*/.next
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+playwright-report/
+test-results/
+coverage/

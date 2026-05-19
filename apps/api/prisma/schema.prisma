@@ -1,0 +1,161 @@
+// opencoder Prisma schema (SQLite)
+// Keep models small and orthogonal. Heavy state (Yjs binary updates) lives in EditEvent.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  pads          Pad[]            @relation("PadOwner")
+  memberships   PadMember[]
+  invites       Invite[]         @relation("InviteCreator")
+  messages      ChatMessage[]
+  editEvents    EditEvent[]
+  questions     Question[]       @relation("QuestionAuthor")
+  interviews    InterviewScore[] @relation("InterviewerScore")
+
+  @@index([email])
+}
+
+model Pad {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  language    String   @default("python")
+  kind        String   @default("sandbox") // sandbox | interview
+  ownerId     String
+  owner       User     @relation("PadOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  questionId  String?
+  question    Question? @relation(fields: [questionId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  files       PadFile[]
+  members     PadMember[]
+  invites     Invite[]
+  messages    ChatMessage[]
+  editEvents  EditEvent[]
+  interview   InterviewScore?
+
+  @@index([ownerId])
+  @@index([slug])
+  @@index([updatedAt])
+}
+
+model PadFile {
+  id        String   @id @default(cuid())
+  padId     String
+  pad       Pad      @relation(fields: [padId], references: [id], onDelete: Cascade)
+  name      String
+  language  String
+  content   String   @default("")
+  yjsState  Bytes?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([padId, name])
+  @@index([padId])
+}
+
+model PadMember {
+  id        String   @id @default(cuid())
+  padId     String
+  pad       Pad      @relation(fields: [padId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("collaborator") // owner | collaborator | viewer | candidate
+  createdAt DateTime @default(now())
+
+  @@unique([padId, userId])
+  @@index([userId])
+}
+
+model Invite {
+  id         String    @id @default(cuid())
+  padId      String
+  pad        Pad       @relation(fields: [padId], references: [id], onDelete: Cascade)
+  email      String?
+  token      String    @unique
+  role       String    @default("collaborator")
+  createdBy  String
+  creator    User      @relation("InviteCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  expiresAt  DateTime?
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([padId])
+  @@index([email])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  padId     String
+  pad       Pad      @relation(fields: [padId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([padId, createdAt])
+}
+
+model EditEvent {
+  id        String   @id @default(cuid())
+  padId     String
+  pad       Pad      @relation(fields: [padId], references: [id], onDelete: Cascade)
+  fileId    String?
+  kind      String   // yjs | run | chat | file | snapshot
+  payload   Bytes
+  meta      String?  // JSON-encoded
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([padId, createdAt])
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  language    String   @default("python")
+  difficulty  String   @default("medium") // easy | medium | hard
+  tags        String   @default("")       // CSV
+  createdBy   String
+  author      User     @relation("QuestionAuthor", fields: [createdBy], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  pads        Pad[]
+
+  @@index([createdBy])
+  @@index([difficulty])
+}
+
+model InterviewScore {
+  id              String   @id @default(cuid())
+  padId           String   @unique
+  pad             Pad      @relation(fields: [padId], references: [id], onDelete: Cascade)
+  interviewerId   String
+  interviewer     User     @relation("InterviewerScore", fields: [interviewerId], references: [id], onDelete: Cascade)
+  correctness     Int      @default(0)   // 0–5
+  style           Int      @default(0)
+  communication   Int      @default(0)
+  problemSolving  Int      @default(0)
+  notes           String   @default("")
+  decision        String   @default("pending") // hire | no_hire | maybe | pending
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
