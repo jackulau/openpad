@@ -1,20 +1,29 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LANGUAGES } from '@opencoder/shared';
+import { groupedLanguages } from '@opencoder/shared';
 import { AppHeader } from '../components/AppHeader';
 import { padsApi } from '../lib/pads';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [language, setLanguage] = useState('python');
+  const groups = useMemo(() => groupedLanguages(), []);
+  const [groupId, setGroupId] = useState('python');
+  const [version, setVersion] = useState<string>(() => {
+    const g = groups.find((gg) => gg.group === 'python');
+    return (g?.versions.find((v) => v.isDefault) ?? g?.versions[0])?.id ?? 'python312';
+  });
   const [kind, setKind] = useState<'sandbox' | 'interview'>('sandbox');
+  const [template, setTemplate] = useState<'hello' | 'leetcode'>('hello');
   const [title, setTitle] = useState('');
+
+  const versions = groups.find((g) => g.group === groupId)?.versions ?? [];
 
   const list = useQuery({ queryKey: ['pads'], queryFn: () => padsApi.list() });
   const create = useMutation({
-    mutationFn: () => padsApi.create({ title: title || undefined, language, kind }),
+    mutationFn: () =>
+      padsApi.create({ title: title || undefined, language: version, kind, template }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['pads'] });
       navigate(`/p/${res.pad.slug}`);
@@ -45,14 +54,46 @@ export function Dashboard() {
               <span className="text-xs uppercase tracking-wide text-zinc-500">Language</span>
               <select
                 className="input mt-1"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
+                value={groupId}
+                onChange={(e) => {
+                  setGroupId(e.target.value);
+                  const g = groups.find((gg) => gg.group === e.target.value);
+                  const def = g?.versions.find((v) => v.isDefault) ?? g?.versions[0];
+                  if (def) setVersion(def.id);
+                }}
               >
-                {Object.values(LANGUAGES).map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label}
+                {groups.map((g) => (
+                  <option key={g.group} value={g.group}>
+                    {g.label}
                   </option>
                 ))}
+              </select>
+            </label>
+            {versions.length > 1 && (
+              <label className="block">
+                <span className="text-xs uppercase tracking-wide text-zinc-500">Version</span>
+                <select
+                  className="input mt-1"
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                >
+                  {versions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.version ?? v.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="block">
+              <span className="text-xs uppercase tracking-wide text-zinc-500">Template</span>
+              <select
+                className="input mt-1"
+                value={template}
+                onChange={(e) => setTemplate(e.target.value as 'hello' | 'leetcode')}
+              >
+                <option value="hello">Hello world</option>
+                <option value="leetcode">LeetCode-style</option>
               </select>
             </label>
             <label className="block">

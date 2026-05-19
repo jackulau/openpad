@@ -16,10 +16,17 @@ export interface PadDetail {
 
 export const padsApi = {
   list: () => api.get<{ pads: PadSummary[] }>('/api/pads'),
-  create: (body: { title?: string; language?: string; kind?: 'sandbox' | 'interview' }) =>
-    api.post<{ pad: PadSummary }>('/api/pads', body),
+  create: (body: {
+    title?: string;
+    language?: string;
+    kind?: 'sandbox' | 'interview';
+    template?: 'hello' | 'leetcode';
+  }) => api.post<{ pad: PadSummary }>('/api/pads', body),
   get: (slug: string) => api.get<PadDetail>(`/api/pads/${slug}`),
   patch: (slug: string, body: { title?: string; language?: string; kind?: string }) =>
     api.patch<{ pad: PadSummary }>(`/api/pads/${slug}`, body),
   delete: (slug: string) => api.delete<{ ok: true }>(`/api/pads/${slug}`),
+  fork: (slug: string) => api.post<{ pad: PadSummary }>(`/api/pads/${slug}/fork`),
+  patchPackages: (slug: string, body: Record<string, string[]>) =>
+    api.patch<{ ok: true }>(`/api/pads/${slug}/packages`, body),
 };

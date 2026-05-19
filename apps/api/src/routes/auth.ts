@@ -66,4 +66,59 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
       user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
     };
   });
+
+  // PATCH /me — change name and/or password.
+  server.patch('/me', { preHandler: server.requireAuth }, async (req, reply) => {
+    const parsed = z
+      .object({
+        name: z.string().trim().min(1).max(80).optional(),
+        currentPassword: z.string().min(1).max(200).optional(),
+        newPassword: z.string().min(8).max(200).optional(),
+      })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    const userId = req.currentUser!.sub;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return reply.code(401).send({ error: 'user_missing' });
+    const data: { name?: string; passwordHash?: string } = {};
+    if (parsed.data.name) data.name = parsed.data.name;
+    if (parsed.data.newPassword) {
+      if (!parsed.data.currentPassword) {
+        return reply.code(400).send({ error: 'current_password_required' });
+      }
+      const ok = await verifyPassword(parsed.data.currentPassword, user.passwordHash);
+      if (!ok) return reply.code(401).send({ error: 'wrong_current_password' });
+      data.passwordHash = await hashPassword(parsed.data.newPassword);
+    }
+    if (Object.keys(data).length === 0) return reply.code(400).send({ error: 'no_changes' });
+    const updated = await prisma.user.update({ where: { id: userId }, data });
+    return {
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        createdAt: updated.createdAt,
+      },
+    };
+  });
+
+  // DELETE /me — destroy the account and all owned content.
+  server.delete('/me', { preHandler: server.requireAuth }, async (req, reply) => {
+    const parsed = z
+      .object({ confirm: z.literal('DELETE'), password: z.string().min(1).max(200) })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    const userId = req.currentUser!.sub;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return reply.code(401).send({ error: 'user_missing' });
+    const ok = await verifyPassword(parsed.data.password, user.passwordHash);
+    if (!ok) return reply.code(401).send({ error: 'wrong_password' });
+    await prisma.user.delete({ where: { id: userId } });
+    clearToken(reply);
+    return { ok: true };
+  });
 }

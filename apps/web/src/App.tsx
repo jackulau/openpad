@@ -11,6 +11,7 @@ const Pad = lazy(() => import('./pages/Pad').then((m) => ({ default: m.Pad })));
 const Playback = lazy(() => import('./pages/Playback').then((m) => ({ default: m.Playback })));
 const Interview = lazy(() => import('./pages/Interview').then((m) => ({ default: m.Interview })));
 const InvitePage = lazy(() => import('./pages/Invite').then((m) => ({ default: m.InvitePage })));
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 
 export function App() {
   const hydrate = useAuth((s) => s.hydrate);
@@ -57,6 +58,14 @@ export function App() {
           }
         />
         <Route path="/invite/:token" element={<InvitePage />} />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

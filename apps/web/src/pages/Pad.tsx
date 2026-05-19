@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { editor as MonacoEditorTypes } from 'monaco-editor';
 import { MonacoBinding } from 'y-monaco';
 import type { AIReviewComment, RunResult } from '@opencoder/shared';
-import { LANGUAGES } from '@opencoder/shared';
+import { groupedLanguages, resolveLanguage } from '@opencoder/shared';
 import { AppHeader } from '../components/AppHeader';
 import { Editor } from '../components/Editor';
 import { OutputPanel } from '../components/OutputPanel';
@@ -13,6 +13,8 @@ import { Chat } from '../components/Chat';
 import { Terminal } from '../components/Terminal';
 import { AIReviewPanel } from '../components/AIReviewPanel';
 import { InvitesPanel } from '../components/InvitesPanel';
+import { PresenceSidebar } from '../components/PresenceSidebar';
+import { ShortcutsModal, useShortcutsModal } from '../components/ShortcutsModal';
 import { padsApi } from '../lib/pads';
 import { execApi } from '../lib/exec';
 import { useCollab } from '../lib/useCollab';
@@ -20,6 +22,9 @@ import { useAuth } from '../lib/authStore';
 import { canEditRole } from '../lib/roles';
 import { passwordApi } from '../lib/passwords';
 import { HttpError } from '../lib/api';
+import { useToasts } from '../lib/toast';
+import { api } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
 
 type RightTab = 'output' | 'chat' | 'terminal' | 'review';
 
@@ -112,12 +117,27 @@ export function Pad() {
     return () => window.removeEventListener('keydown', onKey);
   }, [run, editAllowed]);
 
+  const shortcuts = useShortcutsModal();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const push = useToasts((s) => s.push);
+  const fork = useMutation({
+    mutationFn: () => api.post<{ pad: { slug: string } }>(`/api/pads/${slug}/fork`),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['pads'] });
+      push('Forked to your account', 'success');
+      navigate(`/p/${r.pad.slug}`);
+    },
+    onError: (e) => push(e instanceof HttpError ? e.error : 'Failed', 'error'),
+  });
+
   if (pad.isLoading) return <div className="p-8 text-zinc-400">loading…</div>;
   if (pad.error) return <UnlockOrError slug={slug} onUnlocked={() => pad.refetch()} />;
   if (!pad.data) return null;
 
   const isInterview = pad.data.pad.kind === 'interview';
-  const presenceList = Object.values(presence).filter((p) => p.userId !== user?.id);
+  const currentLang = resolveLanguage(language);
+  const groupId = currentLang?.group ?? language;
 
   return (
     <div className="h-screen flex flex-col">
@@ -126,16 +146,6 @@ export function Pad() {
         <h2 className="font-medium">{pad.data.pad.title}</h2>
         <span className="text-xs text-zinc-500">{slug}</span>
         <ConnectionDot status={status} />
-        <div className="flex items-center gap-1">
-          {presenceList.map((p) => (
-            <span
-              key={p.userId}
-              title={p.name}
-              className="size-2 rounded-full"
-              style={{ backgroundColor: p.color }}
-            />
-          ))}
-        </div>
         <div className="ml-auto flex items-center gap-2">
           {isInterview && (
             <Link to={`/p/${slug}/interview`} className="btn-secondary !py-1">
@@ -145,23 +155,41 @@ export function Pad() {
           <Link to={`/p/${slug}/playback`} className="btn-ghost !py-1">
             Playback
           </Link>
+          <button
+            className="btn-ghost !py-1"
+            onClick={() => fork.mutate()}
+            disabled={fork.isPending}
+            title="Make my own copy"
+          >
+            {fork.isPending ? 'Forking…' : 'Fork'}
+          </button>
           {myRole === 'owner' && (
             <button className="btn-ghost !py-1" onClick={() => setInvitesOpen(true)}>
               Share
             </button>
           )}
-          <select
-            className="input !py-1 !text-sm"
+          <LanguagePicker
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
+            onChange={setLanguage}
             disabled={!editAllowed}
-          >
-            {Object.values(LANGUAGES).map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </select>
+          />
+          {currentLang?.version && (
+            <select
+              className="input !py-1 !text-sm"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              disabled={!editAllowed}
+              title="Version"
+            >
+              {groupedLanguages()
+                .find((g) => g.group === groupId)
+                ?.versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.version}
+                  </option>
+                ))}
+            </select>
+          )}
           <button
             className="btn-primary !py-1"
             onClick={() => run.mutate()}
@@ -183,6 +211,11 @@ export function Pad() {
               setLanguage(f.language);
             }}
             canEdit={editAllowed}
+          />
+          <PresenceSidebar
+            me={user ? { id: user.id, name: user.name } : null}
+            presence={presence}
+            files={pad.data.files}
           />
           <div className="text-xs uppercase tracking-wide text-zinc-500 px-2 mt-4 mb-1">
             Members
@@ -240,7 +273,42 @@ export function Pad() {
       </div>
 
       {invitesOpen && <InvitesPanel slug={slug} onClose={() => setInvitesOpen(false)} />}
+      <ShortcutsModal open={shortcuts.open} onClose={() => shortcuts.setOpen(false)} />
     </div>
+  );
+}
+
+function LanguagePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  const groups = groupedLanguages();
+  // Selection driven by group; mapping to the default version of the picked group.
+  const current = resolveLanguage(value);
+  const currentGroup = current?.group ?? value;
+  return (
+    <select
+      className="input !py-1 !text-sm"
+      value={currentGroup}
+      onChange={(e) => {
+        const g = groups.find((gg) => gg.group === e.target.value);
+        if (!g) return;
+        const def = g.versions.find((v) => v.isDefault) ?? g.versions[0];
+        onChange(def.id);
+      }}
+      disabled={disabled}
+    >
+      {groups.map((g) => (
+        <option key={g.group} value={g.group}>
+          {g.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
