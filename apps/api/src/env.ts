@@ -19,6 +19,10 @@ const schema = z.object({
   EXEC_MEMORY_MB: z.coerce.number().default(256),
   EXEC_CPU: z.string().default('1'),
   EXEC_FORCE_LOCAL: z.coerce.boolean().default(false),
+  // Pre-pull docker images for all configured languages on API boot. Eliminates
+  // the slow first-run image pull. Set false in CI / local dev where images are
+  // already cached or where pulls would be wasted.
+  EXEC_PREPULL: z.coerce.boolean().default(true),
   TERMINAL_IDLE_MS: z.coerce.number().default(10 * 60_000),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(120),
   ALLOWED_ORIGINS: z.string().optional(),
