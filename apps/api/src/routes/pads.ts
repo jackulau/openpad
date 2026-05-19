@@ -112,6 +112,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
           id: true,
           name: true,
           language: true,
+          sortOrder: true,
           updatedAt: true,
           createdAt: true,
         },

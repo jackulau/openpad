@@ -7,6 +7,7 @@ export interface PadDetail {
     id: string;
     name: string;
     language: string;
+    sortOrder: number;
     updatedAt: string;
     createdAt: string;
   }>;

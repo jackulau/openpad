@@ -163,9 +163,7 @@ export class CollabClient {
           /* ignore */
         }
       } else if (type === MSG.ERROR) {
-        // best-effort logging
         try {
-          // eslint-disable-next-line no-console
           console.warn('[collab] error', decodeJSON<unknown>(raw));
         } catch {
           /* ignore */

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { invitesApi, type InviteDTO } from '../lib/invites';
+import { invitesApi } from '../lib/invites';
 import { HttpError } from '../lib/api';
 
 interface Props {
