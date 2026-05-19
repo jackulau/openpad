@@ -16,6 +16,8 @@ import {
   registerInviteRoutes,
 } from './routes/invites.js';
 import { registerPlaybackRoutes } from './routes/playback.js';
+import { registerQuestionRoutes } from './routes/questions.js';
+import { registerInterviewRoutes } from './routes/interviews.js';
 import { registerWebSocket } from './ws/index.js';
 
 export type AppServer = FastifyInstance;
@@ -64,6 +66,8 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerInviteRoutes, { prefix: '/api/pads' });
   await server.register(registerInviteAcceptRoutes, { prefix: '/api/invites' });
   await server.register(registerPlaybackRoutes, { prefix: '/api/pads' });
+  await server.register(registerQuestionRoutes, { prefix: '/api/questions' });
+  await server.register(registerInterviewRoutes, { prefix: '/api/pads' });
   await registerWebSocket(server);
 
   return server;
