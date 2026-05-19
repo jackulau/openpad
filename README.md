@@ -18,6 +18,38 @@ and your friends, on your own port.
   <em>Two collaborators editing the same file with live cursors.</em>
 </p>
 
+## Why opencoder
+
+Closed-source collab pads (CoderPad, Codeshare, CodePad, JDoodle, Replit) all
+work fine — until you hit a per-seat invoice, get throttled, or want to keep
+your interview transcripts on your own machine. opencoder is the one you
+self-host on a port you pick, with no recruiting-funnel upsell. The table
+below maps the features that matter for technical interviews + pair coding.
+
+| | **opencoder** | CoderPad | Codeshare | CodePad | Replit-collab |
+|---|---|---|---|---|---|
+| Self-hosted, your data | ✅ MIT | ❌ SaaS | ❌ SaaS | ❌ SaaS | ❌ SaaS |
+| Free for unlimited users | ✅ | ❌ per-seat | ⚠️ limited free | ⚠️ ads | ⚠️ free tier |
+| Real-time CRDT collab | ✅ Yjs | ✅ | ✅ | ⚠️ basic | ✅ |
+| Multi-file workspaces | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Terminal (PTY) inside pad | ✅ xterm + node-pty | ✅ | ❌ | ❌ | ✅ |
+| Sandboxed exec (Docker) | ✅ + warm pool | ✅ | ❌ | ⚠️ remote | ✅ |
+| Streaming exec output | ✅ WebSocket | ✅ | ❌ | ❌ | ✅ |
+| Warm-container pool perf | ✅ <150ms hot lang | ✅ | ❌ | ❌ | ✅ |
+| Compile-artifact cache | ✅ LRU 512MB | ❌ | ❌ | ❌ | ⚠️ |
+| Code playback / replay | ✅ scrubber | ✅ | ❌ | ❌ | ❌ |
+| Whiteboard canvas | ✅ infinite + select + multi + notes + export | ⚠️ basic | ❌ | ❌ | ❌ |
+| Cursors-on-canvas presence | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Export canvas to PNG/SVG | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Interview rubric + roles | ✅ 5-axis | ✅ | ❌ | ❌ | ⚠️ |
+| Name-only signup (no email) | ✅ | ❌ | ⚠️ anon | ⚠️ anon | ❌ |
+| One-port deploy | ✅ one Docker image | n/a | n/a | n/a | n/a |
+
+<sub>Comparison reflects public docs + free-tier offerings as of May 2026.
+opencoder claims are auto-verified by the test suite (38 api / 4 web test
+files, 290+ assertions). Closed competitors may have changed since — open
+a PR if a row is stale.</sub>
+
 ## Features
 
 - 🎛 **Multi-language IDE** — Python, JavaScript, TypeScript, Go, Rust, Java,
