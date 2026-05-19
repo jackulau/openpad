@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import * as Y from 'yjs';
 import { AppHeader } from '../components/AppHeader';
@@ -28,9 +28,16 @@ const SPEEDS = [0.5, 1, 2, 4] as const;
 
 export function Playback() {
   const { slug = '' } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const recording = searchParams.get('recording') ?? null;
   const tl = useQuery({
-    queryKey: ['playback', slug],
-    queryFn: () => api.get<Timeline>(`/api/pads/${slug}/playback`),
+    queryKey: ['playback', slug, recording],
+    queryFn: () =>
+      api.get<Timeline>(
+        recording
+          ? `/api/pads/${slug}/playback?recording=${encodeURIComponent(recording)}`
+          : `/api/pads/${slug}/playback`,
+      ),
   });
 
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -109,6 +116,11 @@ export function Playback() {
       <AppHeader />
       <div className="border-b border-zinc-800 px-4 py-2 flex items-center gap-3">
         <h2 className="font-medium text-sm">Playback</h2>
+        {recording && (
+          <span className="text-xs px-2 py-0.5 rounded bg-brand-900/40 text-brand-300 border border-brand-800">
+            recording window
+          </span>
+        )}
         <Link to={`/p/${slug}`} className="text-xs text-brand-400 underline">
           back to pad
         </Link>
