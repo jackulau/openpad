@@ -1,0 +1,46 @@
+name: docker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - apps/**
+      - packages/**
+      - pnpm-lock.yaml
+      - package.json
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - docker-compose.yml
+      - .dockerignore
+      - apps/**
+      - packages/**
+      - pnpm-lock.yaml
+      - package.json
+
+jobs:
+  build:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Equivalent to `docker build .` but via buildx for layer caching.
+      - name: Build image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: opencoder:ci
