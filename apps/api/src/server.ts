@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import staticPlugin from '@fastify/static';
@@ -20,17 +21,87 @@ import {
   registerInviteRoutes,
 } from './routes/invites.js';
 import { registerPlaybackRoutes } from './routes/playback.js';
+import { registerPresenceRoutes } from './routes/presence.js';
+import { registerRecordingsRoutes } from './routes/recordings.js';
+import { registerWhiteboardRoutes } from './routes/whiteboard.js';
 import { registerQuestionRoutes } from './routes/questions.js';
 import { registerInterviewRoutes } from './routes/interviews.js';
 import { registerAIReviewRoutes } from './routes/aiReview.js';
 import { registerSetupRoutes } from './routes/setup.js';
+import { reconcileOnBoot } from './services/recordings.js';
 import { registerWebSocket } from './ws/index.js';
 
 export type AppServer = FastifyInstance;
 
+// CSP is tuned so Monaco (WebWorkers via blob:) and xterm (WASM + blob workers)
+// still load. HSTS is preload-friendly but only emitted when behind HTTPS — the
+// dev server is HTTP and operators terminating TLS at a reverse proxy can flip it
+// on with ENABLE_HSTS=1.
+function buildHelmetOptions(): Parameters<typeof helmet>[1] {
+  return {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'blob:'],
+        scriptSrcAttr: ["'none'"],
+        workerSrc: ["'self'", 'blob:'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        fontSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'", 'ws:', 'wss:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: 'same-origin' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
+    strictTransportSecurity: process.env.ENABLE_HSTS === '1'
+      ? { maxAge: 63072000, includeSubDomains: true, preload: true }
+      : false,
+    frameguard: { action: 'deny' },
+    permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+    xssFilter: true,
+    noSniff: true,
+    hidePoweredBy: true,
+  };
+}
+
+// CORS allow-list. Defaults are permissive for dev; production / LAN deployments
+// should set ALLOWED_ORIGINS to a comma-separated list of allowed origins.
+function buildCorsOptions(): Parameters<typeof cors>[1] {
+  const raw = process.env.ALLOWED_ORIGINS?.trim();
+  if (!raw) {
+    // Reflect the request origin so local dev + LAN both work without config.
+    // Operators who want a strict allow-list must set ALLOWED_ORIGINS.
+    return { origin: true, credentials: true };
+  }
+  const allowList = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    origin: (origin, cb) => {
+      // Same-origin / non-browser requests (no Origin header) are allowed.
+      if (!origin) return cb(null, true);
+      if (allowList.includes(origin)) return cb(null, true);
+      return cb(new Error('origin_not_allowed'), false);
+    },
+    credentials: true,
+  };
+}
+
 export interface BuildServerOptions {
   /** Skip rate-limit + heavy plugins for tests. */
   test?: boolean;
+  /**
+   * When true, enables per-route rate limits even in test mode.
+   * Used by rate-limit tests; normal tests leave it false to avoid interference.
+   */
+  enableRateLimitInTests?: boolean;
 }
 
 export async function buildServer(opts: BuildServerOptions = {}): Promise<AppServer> {
@@ -47,18 +118,36 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   });
 
   await server.register(cookie);
-  await server.register(cors, { origin: true, credentials: true });
+  await server.register(helmet, buildHelmetOptions());
+  await server.register(cors, buildCorsOptions());
   await server.register(jwt, {
     secret: env.JWT_SECRET,
     cookie: { cookieName: 'oc_token', signed: false },
   });
-  if (!isTest) {
-    await server.register(rateLimit, {
-      max: env.RATE_LIMIT_PER_MINUTE,
-      timeWindow: '1 minute',
-    });
-  }
-  await server.register(websocket, { options: { maxPayload: 4 * 1024 * 1024 } });
+  // Always register rate-limit so per-route overrides on auth endpoints take effect.
+  // In tests we bypass via allowList so unrelated tests don't trip into 429s.
+  const rateLimitDisabled = isTest && opts.enableRateLimitInTests !== true;
+  await server.register(rateLimit, {
+    global: !rateLimitDisabled,
+    max: env.RATE_LIMIT_PER_MINUTE,
+    timeWindow: '1 minute',
+    keyGenerator: (req) => req.ip,
+    allowList: rateLimitDisabled ? () => true : undefined,
+  });
+  await server.register(websocket, {
+    options: {
+      maxPayload: 4 * 1024 * 1024,
+      // Browser WebSocket can't send custom headers; we pass the bearer token
+      // through Sec-WebSocket-Protocol as "oc.bearer.<jwt>". Accept it here so
+      // the handshake completes; the route handler verifies the JWT.
+      handleProtocols: (protocols: Set<string>) => {
+        for (const p of protocols) {
+          if (p.startsWith('oc.bearer.')) return p;
+        }
+        return false;
+      },
+    },
+  });
   await server.register(authPlugin);
 
   server.get('/health', async () => ({ ok: true, name: 'opencoder', version: '0.1.0' }));
@@ -72,6 +161,9 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerInviteRoutes, { prefix: '/api/pads' });
   await server.register(registerInviteAcceptRoutes, { prefix: '/api/invites' });
   await server.register(registerPlaybackRoutes, { prefix: '/api/pads' });
+  await server.register(registerPresenceRoutes, { prefix: '/api/pads' });
+  await server.register(registerRecordingsRoutes, { prefix: '/api/pads' });
+  await server.register(registerWhiteboardRoutes, { prefix: '/api/pads' });
   await server.register(registerQuestionRoutes, { prefix: '/api/questions' });
   await server.register(registerInterviewRoutes, { prefix: '/api/pads' });
   await server.register(registerAIReviewRoutes, { prefix: '/api/pads' });
@@ -80,6 +172,15 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
 
   // Serve the SPA bundle alongside the API when it has been built.
   await maybeRegisterStaticWeb(server);
+
+  // Close any Recording row left orphaned by a previous crash. Skipped under
+  // test mode so per-test fixtures aren't disturbed; the production index.ts
+  // entrypoint flows through here with isTest=false.
+  if (!isTest) {
+    await reconcileOnBoot().catch((err: unknown) => {
+      server.log.warn({ err }, 'reconcileOnBoot failed at startup');
+    });
+  }
 
   return server;
 }
