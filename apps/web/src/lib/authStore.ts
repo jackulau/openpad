@@ -9,6 +9,7 @@ interface AuthState {
   hydrate: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, name: string, password: string) => Promise<void>;
+  guest: (name: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -51,6 +52,18 @@ export const useAuth = create<AuthState>((set, get) => ({
         email,
         name,
         password,
+      });
+      setToken(res.token);
+      set({ user: res.user, hydrated: true });
+    } finally {
+      set({ loading: false });
+    }
+  },
+  guest: async (name) => {
+    set({ loading: true });
+    try {
+      const res = await api.post<{ token: string; user: PublicUser }>('/api/auth/guest', {
+        name,
       });
       setToken(res.token);
       set({ user: res.user, hydrated: true });

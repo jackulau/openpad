@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { clearToken, issueToken } from '../lib/auth.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { randomToken } from '../lib/slug.js';
 
 const registerBody = z.object({
   email: z.string().email().max(254),
@@ -16,6 +18,31 @@ const loginBody = z.object({
 });
 
 export async function registerAuthRoutes(server: FastifyInstance): Promise<void> {
+  // Friction-free signup: just pick a name. Returns a token immediately.
+  // Use this for the friends-only flow. /register stays for users who want
+  // an email + password they can log back in with.
+  server.post('/guest', async (req, reply) => {
+    const parsed = z
+      .object({ name: z.string().trim().min(1).max(80) })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+    }
+    // Stable, opaque email so the unique-on-email constraint doesn't collide.
+    const handle = randomToken(10).toLowerCase();
+    const email = `guest-${handle}@local`;
+    const password = randomBytes(24).toString('hex');
+    const passwordHash = await hashPassword(password);
+    const user = await prisma.user.create({
+      data: { email, name: parsed.data.name, passwordHash },
+    });
+    const token = await issueToken(reply, { sub: user.id, email: user.email, name: user.name });
+    return reply.code(201).send({
+      token,
+      user: { id: user.id, email: user.email, name: user.name, createdAt: user.createdAt },
+    });
+  });
+
   server.post('/register', async (req, reply) => {
     const parsed = registerBody.safeParse(req.body);
     if (!parsed.success) {
