@@ -6,13 +6,13 @@ import { useAuth } from '../lib/authStore';
 import { settingsApi } from '../lib/settings';
 import { setToken, HttpError } from '../lib/api';
 import { useToasts } from '../lib/toast';
-import { useTheme } from '../lib/theme';
+import { EDITOR_THEMES, useTheme } from '../lib/theme';
 
 export function Settings() {
   const { user, hydrate, logout } = useAuth();
   const navigate = useNavigate();
   const push = useToasts((s) => s.push);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, editorTheme, setEditorTheme } = useTheme();
 
   const [name, setName] = useState(user?.name ?? '');
   const [confirmText, setConfirmText] = useState('');
@@ -80,20 +80,45 @@ export function Settings() {
         </section>
 
         <section className="card p-5 space-y-4">
-          <h2 className="text-lg font-semibold">Theme</h2>
-          <div className="flex items-center gap-2">
-            <button
-              className={`btn-secondary ${theme === 'dark' ? 'ring-2 ring-brand-400' : ''}`}
-              onClick={() => setTheme('dark')}
-            >
-              ☾ Dark
-            </button>
-            <button
-              className={`btn-secondary ${theme === 'light' ? 'ring-2 ring-brand-400' : ''}`}
-              onClick={() => setTheme('light')}
-            >
-              ☀ Light
-            </button>
+          <h2 className="text-lg font-semibold">Appearance</h2>
+          <div className="space-y-2">
+            <span className="text-sm text-secondary block">App theme</span>
+            <div className="flex items-center gap-2">
+              <button
+                className={`btn-secondary ${theme === 'dark' ? 'ring-2' : ''}`}
+                onClick={() => setTheme('dark')}
+              >
+                Dark
+              </button>
+              <button
+                className={`btn-secondary ${theme === 'light' ? 'ring-2' : ''}`}
+                onClick={() => setTheme('light')}
+              >
+                Light
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-sm text-secondary">Editor theme</span>
+              <select
+                className="input mt-1"
+                value={editorTheme}
+                onChange={(e) =>
+                  setEditorTheme(e.target.value as typeof editorTheme)
+                }
+              >
+                {EDITOR_THEMES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-xs text-subtle">
+              Editor theme is independent of the app theme. Pick any IDE colorway
+              for the code editor.
+            </p>
           </div>
         </section>
 

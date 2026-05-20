@@ -126,7 +126,7 @@ export function Playback() {
       <div className="border-b border-line px-4 py-2 flex items-center gap-3">
         <h2 className="font-medium text-sm">Playback</h2>
         {recording && (
-          <span className="text-xs px-2 py-0.5 rounded bg-brand-900/40 text-brand-300 border border-brand-800">
+          <span className="chip-accent">
             recording window
           </span>
         )}

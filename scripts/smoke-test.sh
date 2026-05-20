@@ -46,11 +46,10 @@ if ! curl -sf "http://127.0.0.1:$API_PORT/health" >/dev/null; then
 fi
 echo "    /health ok"
 
-EMAIL="smoke-$RANDOM@opencoder.test"
-echo "==> registering $EMAIL"
-TOKEN=$(curl -sf -X POST "http://127.0.0.1:$API_PORT/api/auth/register" \
+echo "==> guest signup (name-only)"
+TOKEN=$(curl -sf -X POST "http://127.0.0.1:$API_PORT/api/auth/guest" \
   -H "content-type: application/json" \
-  -d "{\"email\":\"$EMAIL\",\"name\":\"Smoke\",\"password\":\"password1234\"}" \
+  -d '{"name":"Smoke"}' \
   | python3 -c 'import json, sys; print(json.load(sys.stdin)["token"])')
 
 if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then

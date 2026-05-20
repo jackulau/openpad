@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import Monaco, { type Monaco as MonacoNs, type OnMount } from '@monaco-editor/react';
 import type * as MonacoEditorTypes from 'monaco-editor';
 import { useTheme } from '../lib/theme';
+import { applyMonacoTheme, defineMonacoThemes } from '../lib/monaco-themes';
 
 export interface RemoteCursor {
   userId: string;
@@ -32,44 +33,6 @@ function cssId(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-// Monaco themes are keyed by name; declaring both up-front means we can switch
-// without re-defining. Colors mirror the CSS variables in index.css so the
-// editor blends with the surrounding chrome in either theme.
-function defineThemes(monaco: MonacoNs): void {
-  monaco.editor.defineTheme('opencoder-dark', {
-    base: 'vs-dark',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': '#12151c',
-      'editor.foreground': '#f4f4f5',
-      'editorLineNumber.foreground': '#586273',
-      'editorLineNumber.activeForeground': '#a1aab8',
-      'editor.selectionBackground': '#22d3ee33',
-      'editor.lineHighlightBackground': '#1a1e27',
-      'editorCursor.foreground': '#22d3ee',
-      'editorWidget.background': '#181c24',
-      'editorWidget.border': '#272d38',
-    },
-  });
-  monaco.editor.defineTheme('opencoder-light', {
-    base: 'vs',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': '#ffffff',
-      'editor.foreground': '#1f2937',
-      'editorLineNumber.foreground': '#9ca3af',
-      'editorLineNumber.activeForeground': '#4b5563',
-      'editor.selectionBackground': '#06b6d422',
-      'editor.lineHighlightBackground': '#f5f7fa',
-      'editorCursor.foreground': '#0891b2',
-      'editorWidget.background': '#ffffff',
-      'editorWidget.border': '#e2e5ea',
-    },
-  });
-}
-
 export function Editor({
   value,
   onChange,
@@ -84,22 +47,21 @@ export function Editor({
   const decorationsRef = useRef<string[]>([]);
   const widgetsRef = useRef<Map<string, MonacoEditorTypes.editor.IContentWidget>>(new Map());
   const styleTagRef = useRef<HTMLStyleElement | null>(null);
-  const { theme } = useTheme();
+  const { editorTheme } = useTheme();
 
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    defineThemes(monaco);
-    monaco.editor.setTheme(theme === 'light' ? 'opencoder-light' : 'opencoder-dark');
+    defineMonacoThemes(monaco);
+    applyMonacoTheme(monaco, editorTheme);
     onMount?.(editor, monaco);
   };
 
-  // React to theme toggles after mount.
   useEffect(() => {
     const monaco = monacoRef.current;
     if (!monaco) return;
-    monaco.editor.setTheme(theme === 'light' ? 'opencoder-light' : 'opencoder-dark');
-  }, [theme]);
+    applyMonacoTheme(monaco, editorTheme);
+  }, [editorTheme]);
 
   useEffect(() => {
     if (!editorRef.current) return;

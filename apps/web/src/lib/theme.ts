@@ -2,16 +2,49 @@ import { create } from 'zustand';
 
 export type Theme = 'dark' | 'light';
 
-const STORAGE_KEY = 'oc_theme';
+export type EditorTheme =
+  | 'opencoder-dark'
+  | 'opencoder-light'
+  | 'github-dark'
+  | 'github-light'
+  | 'monokai'
+  | 'dracula'
+  | 'solarized-dark'
+  | 'solarized-light'
+  | 'nord'
+  | 'one-dark';
 
-function readInitial(): Theme {
+export const EDITOR_THEMES: ReadonlyArray<{ id: EditorTheme; label: string; mode: Theme }> = [
+  { id: 'opencoder-dark', label: 'opencoder dark', mode: 'dark' },
+  { id: 'opencoder-light', label: 'opencoder light', mode: 'light' },
+  { id: 'github-dark', label: 'GitHub Dark', mode: 'dark' },
+  { id: 'github-light', label: 'GitHub Light', mode: 'light' },
+  { id: 'one-dark', label: 'One Dark', mode: 'dark' },
+  { id: 'dracula', label: 'Dracula', mode: 'dark' },
+  { id: 'monokai', label: 'Monokai', mode: 'dark' },
+  { id: 'nord', label: 'Nord', mode: 'dark' },
+  { id: 'solarized-dark', label: 'Solarized Dark', mode: 'dark' },
+  { id: 'solarized-light', label: 'Solarized Light', mode: 'light' },
+];
+
+const THEME_KEY = 'oc_theme';
+const EDITOR_KEY = 'oc_editor_theme';
+
+function readInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'dark';
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = localStorage.getItem(THEME_KEY);
   if (stored === 'light' || stored === 'dark') return stored;
   return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
 
-function apply(theme: Theme): void {
+function readInitialEditorTheme(mode: Theme): EditorTheme {
+  if (typeof window === 'undefined') return mode === 'light' ? 'opencoder-light' : 'opencoder-dark';
+  const stored = localStorage.getItem(EDITOR_KEY);
+  if (stored && EDITOR_THEMES.some((t) => t.id === stored)) return stored as EditorTheme;
+  return mode === 'light' ? 'opencoder-light' : 'opencoder-dark';
+}
+
+function applyTheme(theme: Theme): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   if (theme === 'dark') {
@@ -25,26 +58,34 @@ function apply(theme: Theme): void {
 
 interface ThemeState {
   theme: Theme;
+  editorTheme: EditorTheme;
   setTheme: (t: Theme) => void;
   toggle: () => void;
+  setEditorTheme: (t: EditorTheme) => void;
 }
 
 export const useTheme = create<ThemeState>((set) => {
-  const initial = readInitial();
-  apply(initial);
+  const initialTheme = readInitialTheme();
+  const initialEditor = readInitialEditorTheme(initialTheme);
+  applyTheme(initialTheme);
   return {
-    theme: initial,
+    theme: initialTheme,
+    editorTheme: initialEditor,
     setTheme: (t) => {
-      localStorage.setItem(STORAGE_KEY, t);
-      apply(t);
+      localStorage.setItem(THEME_KEY, t);
+      applyTheme(t);
       set({ theme: t });
     },
     toggle: () =>
       set((s) => {
         const next: Theme = s.theme === 'dark' ? 'light' : 'dark';
-        localStorage.setItem(STORAGE_KEY, next);
-        apply(next);
+        localStorage.setItem(THEME_KEY, next);
+        applyTheme(next);
         return { theme: next };
       }),
+    setEditorTheme: (t) => {
+      localStorage.setItem(EDITOR_KEY, t);
+      set({ editorTheme: t });
+    },
   };
 });

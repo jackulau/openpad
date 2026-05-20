@@ -4,28 +4,21 @@ interface Props {
   className?: string;
 }
 
-// Brand mark: stylised angle-bracket + slash combo evoking "</>" — fits a
-// coding-tool identity. Pure SVG so it scales + recolours via currentColor.
 export function Logo({ size = 24, withText = true, className = '' }: Props) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <span
-        className="inline-flex items-center justify-center rounded-md shadow-soft"
-        style={{
-          width: size,
-          height: size,
-          backgroundColor: 'rgb(var(--oc-accent))',
-          color: 'rgb(var(--oc-accent-fg))',
-        }}
+        className="inline-flex items-center justify-center text-primary"
+        style={{ width: size, height: size }}
         aria-hidden="true"
       >
         <svg
-          width={size * 0.72}
-          height={size * 0.72}
+          width={size}
+          height={size}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2.5"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         >

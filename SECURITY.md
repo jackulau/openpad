@@ -92,13 +92,12 @@ with Docker available. The fallback exists for development convenience only.
 
 | Endpoint                | Limit (per IP, per minute) |
 |-------------------------|----------------------------|
-| `POST /api/auth/login`  | 10                         |
-| `POST /api/auth/register` | 5                        |
 | `POST /api/auth/guest`  | 10                         |
 | Everything else (global) | `RATE_LIMIT_PER_MINUTE` (default 120) |
 
-Failed logins are recorded in the **audit log** (`AuditLog` table). Operators
-can query the log to detect brute-force attempts.
+Auth is name-only — there is no password or email-login surface to brute-force.
+Account events (signup, name change, deletion) are recorded in the **audit log**
+(`AuditLog` table).
 
 ## Security Headers
 

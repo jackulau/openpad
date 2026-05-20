@@ -46,8 +46,8 @@ below maps the features that matter for technical interviews + pair coding.
 | One-port deploy | ✅ one Docker image | n/a | n/a | n/a | n/a |
 
 <sub>Comparison reflects public docs + free-tier offerings as of May 2026.
-opencoder claims are auto-verified by the test suite (38 api / 4 web test
-files, 290+ assertions). Closed competitors may have changed since — open
+opencoder claims are backed by its test suite (42 api / 4 web test
+files, 292 assertions — run `pnpm test`). Closed competitors may have changed since — open
 a PR if a row is stale.</sub>
 
 ## Features
