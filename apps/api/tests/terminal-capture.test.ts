@@ -46,7 +46,7 @@ describe('TerminalCapture', () => {
     });
     cap.recordOutput('1234567890');
     expect(persisted).toHaveLength(0);
-    cap.recordOutput('abcdef'); // total 16 bytes — flush
+    cap.recordOutput('abcdef'); // total 16 bytes - flush
     // flush is fire-and-forget; let the microtask settle.
     await wait(10);
     expect(persisted).toHaveLength(1);

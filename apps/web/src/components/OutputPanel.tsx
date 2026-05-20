@@ -11,7 +11,7 @@ export function OutputPanel({ result, running }: { result?: RunResult; running: 
       )}
       {!running && !result && (
         <div className="text-subtle">
-          Press <kbd className="kbd">⌘</kbd>
+          Press <kbd className="kbd">Cmd</kbd>
           <kbd className="kbd">↵</kbd> to run.
         </div>
       )}
@@ -29,7 +29,7 @@ function ResultView({ result }: { result: RunResult }) {
           className={`chip ${ok ? 'chip-success' : 'chip-danger'} !text-[11px]`}
           title={ok ? 'Exited cleanly' : 'Non-zero exit code'}
         >
-          {ok ? '✓ exit 0' : `exit ${String(result.exitCode)}`}
+          {ok ? '[OK] exit 0' : `exit ${String(result.exitCode)}`}
         </span>
         <span className="chip">{result.durationMs}ms</span>
         <span className="chip">{result.runner}</span>

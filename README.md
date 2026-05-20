@@ -5,11 +5,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178c6?logo=typescript&logoColor=white)](./tsconfig.base.json)
 [![Self-hosted](https://img.shields.io/badge/Deploy-Self--hosted-0ea5e9)](./docker-compose.yml)
 
-A self-hosted, open-source **CoderPad-style** collaborative coding pad — for you
+A self-hosted, open-source **CoderPad-style** collaborative coding pad - for you
 and your friends, on your own port.
 
 > Run it on your machine. Pick a port. Share the URL with friends. Code,
-> debug, run, interview, score — all in real time. No SaaS, no per-seat
+> debug, run, interview, score - all in real time. No SaaS, no per-seat
 > billing, no AI hiring funnel. Just a programmable workspace you control.
 
 <p align="center">
@@ -21,58 +21,58 @@ and your friends, on your own port.
 ## Why opencoder
 
 Closed-source collab pads (CoderPad, Codeshare, CodePad, JDoodle, Replit) all
-work fine — until you hit a per-seat invoice, get throttled, or want to keep
+work fine - until you hit a per-seat invoice, get throttled, or want to keep
 your interview transcripts on your own machine. opencoder is the one you
 self-host on a port you pick, with no recruiting-funnel upsell. The table
 below maps the features that matter for technical interviews + pair coding.
 
 | | **opencoder** | CoderPad | Codeshare | CodePad | Replit-collab |
 |---|---|---|---|---|---|
-| Self-hosted, your data | ✅ MIT | ❌ SaaS | ❌ SaaS | ❌ SaaS | ❌ SaaS |
-| Free for unlimited users | ✅ | ❌ per-seat | ⚠️ limited free | ⚠️ ads | ⚠️ free tier |
-| Real-time CRDT collab | ✅ Yjs | ✅ | ✅ | ⚠️ basic | ✅ |
-| Multi-file workspaces | ✅ | ✅ | ❌ | ❌ | ✅ |
-| Terminal (PTY) inside pad | ✅ xterm + node-pty | ✅ | ❌ | ❌ | ✅ |
-| Sandboxed exec (Docker) | ✅ + warm pool | ✅ | ❌ | ⚠️ remote | ✅ |
-| Streaming exec output | ✅ WebSocket | ✅ | ❌ | ❌ | ✅ |
-| Warm-container pool perf | ✅ <150ms hot lang | ✅ | ❌ | ❌ | ✅ |
-| Compile-artifact cache | ✅ LRU 512MB | ❌ | ❌ | ❌ | ⚠️ |
-| Code playback / replay | ✅ scrubber | ✅ | ❌ | ❌ | ❌ |
-| Whiteboard canvas | ✅ infinite + select + multi + notes + export | ⚠️ basic | ❌ | ❌ | ❌ |
-| Cursors-on-canvas presence | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Export canvas to PNG/SVG | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Interview rubric + roles | ✅ 5-axis | ✅ | ❌ | ❌ | ⚠️ |
-| Name-only signup (no email) | ✅ | ❌ | ⚠️ anon | ⚠️ anon | ❌ |
-| One-port deploy | ✅ one Docker image | n/a | n/a | n/a | n/a |
+| Self-hosted, your data | Yes MIT | No SaaS | No SaaS | No SaaS | No SaaS |
+| Free for unlimited users | Yes | No per-seat | Partial limited free | Partial ads | Partial free tier |
+| Real-time CRDT collab | Yes Yjs | Yes | Yes | Partial basic | Yes |
+| Multi-file workspaces | Yes | Yes | No | No | Yes |
+| Terminal (PTY) inside pad | Yes xterm + node-pty | Yes | No | No | Yes |
+| Sandboxed exec (Docker) | Yes + warm pool | Yes | No | Partial remote | Yes |
+| Streaming exec output | Yes WebSocket | Yes | No | No | Yes |
+| Warm-container pool perf | Yes <150ms hot lang | Yes | No | No | Yes |
+| Compile-artifact cache | Yes LRU 512MB | No | No | No | Partial |
+| Code playback / replay | Yes scrubber | Yes | No | No | No |
+| Whiteboard canvas | Yes infinite + select + multi + notes + export | Partial basic | No | No | No |
+| Cursors-on-canvas presence | Yes | No | No | No | No |
+| Export canvas to PNG/SVG | Yes | No | No | No | No |
+| Interview rubric + roles | Yes 5-axis | Yes | No | No | Partial |
+| Name-only signup (no email) | Yes | No | Partial anon | Partial anon | No |
+| One-port deploy | Yes one Docker image | n/a | n/a | n/a | n/a |
 
 <sub>Comparison reflects public docs + free-tier offerings as of May 2026.
 opencoder claims are backed by its test suite (42 api / 4 web test
-files, 292 assertions — run `pnpm test`). Closed competitors may have changed since — open
+files, 292 assertions - run `pnpm test`). Closed competitors may have changed since - open
 a PR if a row is stale.</sub>
 
 ## Features
 
-- 🎛 **Multi-language IDE** — Python, JavaScript, TypeScript, Go, Rust, Java,
-  C, C++, Ruby, C# — sandboxed in Docker (with a graceful local-subprocess
+- **Multi-language IDE** - Python, JavaScript, TypeScript, Go, Rust, Java,
+  C, C++, Ruby, C# - sandboxed in Docker (with a graceful local-subprocess
   fallback when Docker isn't there)
-- 🤝 **Real-time collab** — Yjs CRDT-backed editor, presence + cursors, no
+- **Real-time collab** - Yjs CRDT-backed editor, presence + cursors, no
   conflicts
-- 📁 **Multi-file workspaces** per pad, rename / delete / sort
-- 🖥 **Terminal** with `xterm.js` + `node-pty` (sandboxed shell inside the pad)
-- 💬 **Chat sidebar** per pad with history
-- ⏪ **Code playback** — scrub the editing timeline like a film strip, replay
+- **Multi-file workspaces** per pad, rename / delete / sort
+- **Terminal** with `xterm.js` + `node-pty` (sandboxed shell inside the pad)
+- **Chat sidebar** per pad with history
+- **Code playback** - scrub the editing timeline like a film strip, replay
   every keystroke + run + chat
-- 🧪 **Interview rooms** with a question bank, candidate-only view, and
+- **Interview rooms** with a question bank, candidate-only view, and
   structured 5-axis rubric (correctness / style / communication / problem
   solving / hire-or-not)
-- 🤖 **AI code review** (optional, opt-in) — point at Claude or OpenAI and
+- **AI code review** (optional, opt-in) - point at Claude or OpenAI and
   get inline `{file, line, severity, comment}` annotations
-- 👥 **Invites + share links** with roles: `owner / collaborator / viewer /
+- **Invites + share links** with roles: `owner / collaborator / viewer /
   candidate`
-- 📦 **One-port deploy** — single Docker image serves the SPA + API + WS,
+- **One-port deploy** - single Docker image serves the SPA + API + WS,
   one `PORT` you choose
 
-## Quickstart — self-host (one port, one command)
+## Quickstart - self-host (one port, one command)
 
 ```bash
 # 1. Clone
@@ -81,7 +81,7 @@ cd opencoder
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — at minimum set a strong JWT_SECRET. Pick PORT if you like.
+# Edit .env - at minimum set a strong JWT_SECRET. Pick PORT if you like.
 # Generate a secret:
 #   openssl rand -hex 32
 
@@ -98,7 +98,7 @@ open "http://localhost:${PORT:-4000}"
 
 **Important:** the compose file mounts your host Docker socket so the API
 can spawn sandboxed code-runner containers. If you don't want that, set
-`EXEC_FORCE_LOCAL=true` in your `.env` — code will run as subprocesses
+`EXEC_FORCE_LOCAL=true` in your `.env` - code will run as subprocesses
 inside the api container instead. (Less isolated. Friends-only trust.)
 
 ## Developing locally
@@ -131,24 +131,24 @@ pulling new migrations), use `pnpm db:setup`.
 
 ## Troubleshooting
 
-- **`Error: JWT_SECRET must be set ... in production`** — you started the
+- **`Error: JWT_SECRET must be set ... in production`** - you started the
   server with `NODE_ENV=production` and either an empty, short, or default
   `JWT_SECRET`. Generate one with `openssl rand -hex 32` and put it in
   `.env`. The dev fallback is intentionally blocked in prod.
-- **`Error: Prisma table not found` / `no such table`** — migrations
+- **`Error: Prisma table not found` / `no such table`** - migrations
   haven't been applied to the configured `DATABASE_URL`. Run
   `pnpm db:setup` (or `pnpm --filter @opencoder/api exec prisma migrate
   deploy`).
-- **Port 4000 already in use** — set `PORT` to something free in `.env`
+- **Port 4000 already in use** - set `PORT` to something free in `.env`
   (Docker) or via `PORT=4123 pnpm dev` (local).
-- **`Cannot connect to the Docker daemon`** — either start Docker
+- **`Cannot connect to the Docker daemon`** - either start Docker
   Desktop, or set `EXEC_FORCE_LOCAL=true` in `.env` to fall back to
-  subprocess execution. The local fallback is **less isolated** — only use
+  subprocess execution. The local fallback is **less isolated** - only use
   it on a single-user machine with code you trust.
-- **`pnpm: command not found` or wrong pnpm version** — run
+- **`pnpm: command not found` or wrong pnpm version** - run
   `corepack enable && corepack prepare pnpm@10.12.4 --activate`. The
   `packageManager` field in `package.json` pins this exact version.
-- **Login shows `Invalid token`** after restarting the dev server — you
+- **Login shows `Invalid token`** after restarting the dev server - you
   changed `JWT_SECRET`. Clear `localStorage` for `localhost:5173` and log
   in again.
 
@@ -164,7 +164,7 @@ docker compose up --build -d
 pnpm dev
 ```
 
-Always re-run `prisma migrate deploy` after pulling — new migrations are
+Always re-run `prisma migrate deploy` after pulling - new migrations are
 only applied when you ask. The compose `restart: unless-stopped` policy
 means a fresh build replaces the running container in seconds.
 
@@ -205,10 +205,10 @@ at any point in time.
 
 | Role           | Edit code | Run code | Terminal | Chat | Score | Invite |
 | -------------- | :-------: | :------: | :------: | :--: | :---: | :----: |
-| `owner`        |     ✓     |    ✓     |    ✓     |  ✓   |   ✓   |   ✓    |
-| `collaborator` |     ✓     |    ✓     |    ✓     |  ✓   |       |        |
-| `candidate`    |     ✓     |    ✓     |    ✓     |  ✓   |       |        |
-| `viewer`       |           |          |          |  ✓   |       |        |
+| `owner` | [OK] | [OK] | [OK] | [OK] | [OK] | [OK] |
+| `collaborator` | [OK] | [OK] | [OK] | [OK] | | |
+| `candidate` | [OK] | [OK] | [OK] | [OK] | | |
+| `viewer` | | | | [OK] | | |
 
 (Candidates differ from collaborators only in the interview UI: they don't
 see the interviewer's rubric.)
@@ -225,10 +225,10 @@ see the interviewer's rubric.)
   Tunnel for off-LAN access.
 - **Code execution** runs in throwaway Docker containers with a memory cap,
   CPU cap, no network, and a tmpfs. If Docker isn't available, fall back to
-  local subprocess — only safe with friends you trust.
+  local subprocess - only safe with friends you trust.
 - **Terminals** spawn a real shell inside the api container (or, if you're
   doing dev, on your laptop). Don't grant `collaborator` to randoms.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT - see [LICENSE](./LICENSE).

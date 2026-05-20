@@ -10,7 +10,7 @@
 //   2 = update (bi-directional: Yjs update, fileId-prefixed)
 //   3 = awareness (bi-directional: presence JSON, fileId-prefixed)
 //   4 = chat (bi-directional: JSON {body})
-//   5 = terminal (bi-directional: terminal data — wrapped JSON in payload)
+// 5 = terminal (bi-directional: terminal data - wrapped JSON in payload)
 //   6 = error (server → client: JSON {error, message})
 //   7 = ping (bi-directional: empty)
 //   8 = pong (bi-directional: empty)

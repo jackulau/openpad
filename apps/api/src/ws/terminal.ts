@@ -4,7 +4,7 @@ import { canEdit, getPadAccess } from '../lib/permissions.js';
 import { env } from '../env.js';
 import { TerminalCapture } from '../services/terminalCapture.js';
 
-// Lazy import — node-pty is a native module that may fail to build on some hosts.
+// Lazy import - node-pty is a native module that may fail to build on some hosts.
 type IPty = {
   write: (data: string) => void;
   resize: (cols: number, rows: number) => void;

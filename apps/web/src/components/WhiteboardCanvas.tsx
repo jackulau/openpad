@@ -100,7 +100,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
 
   const currentTool = useMemo(() => TOOLS.find((t) => t.id === tool) ?? TOOLS[0], [tool]);
 
-  // Subscribe to peer presence — pick out users hovering the canvas. Each
+  // Subscribe to peer presence - pick out users hovering the canvas. Each
   // remote cursor renders as a small dot + name label at the broadcast world
   // coord. Clears when they leave (canvasCursor === null) or disconnect.
   useEffect(() => {
@@ -209,7 +209,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
         setSelectedIds(new Set());
         return;
       }
-      // Cmd/Ctrl+A — select all
+      // Cmd/Ctrl+A - select all
       if (meta && e.key.toLowerCase() === 'a') {
         e.preventDefault();
         setSelectedIds(new Set(strokes.map((s) => s.id)));
@@ -311,7 +311,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
       const rect = svg.getBoundingClientRect();
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        // Cap per-event delta — browsers report ±100 for mouse wheel clicks,
+        // Cap per-event delta - browsers report ±100 for mouse wheel clicks,
         // ~±5 for trackpad pinches. Clamp keeps both reasonable.
         const clamped = Math.max(-50, Math.min(50, e.deltaY));
         const factor = Math.exp(-clamped * 0.01);
@@ -569,7 +569,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
           <button
             onClick={() => undoMgrRef.current?.undo()}
             className="btn-ghost !px-2 !py-1 text-secondary"
-            title="Undo (⌘Z)"
+            title="Undo (CmdZ)"
             aria-label="Undo"
           >
             <UndoIcon />
@@ -577,7 +577,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
           <button
             onClick={() => undoMgrRef.current?.redo()}
             className="btn-ghost !px-2 !py-1 text-secondary"
-            title="Redo (⇧⌘Z)"
+            title="Redo (⇧CmdZ)"
             aria-label="Redo"
           >
             <RedoIcon />
@@ -643,7 +643,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
             </defs>
             <g transform={`translate(${-viewport.x} ${-viewport.y}) scale(${viewport.zoom})`}>
               {(() => {
-                // Viewport culling — skip strokes whose bbox is fully off-screen.
+                // Viewport culling - skip strokes whose bbox is fully off-screen.
                 // World-coord visible bounds = viewport.x..(viewport.x+w/z) etc.
                 // Use clientWidth/Height so we don't recompute layout on every
                 // render; svgRef may be null pre-mount (return full list).
@@ -803,11 +803,11 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
                 <span className="kbd">R</span> rect ·{' '}
                 <span className="kbd">A</span> arrow ·{' '}
                 <span className="kbd">T</span> text ·{' '}
-                <span className="kbd">⌘Z</span> undo
+                <span className="kbd">CmdZ</span> undo
               </p>
               <p className="text-xs mt-1">
                 Navigate: <span className="kbd">space</span>+drag or middle-click pan ·{' '}
-                <span className="kbd">⌘</span>+scroll zoom
+                <span className="kbd">Cmd</span>+scroll zoom
               </p>
             </div>
           </div>
@@ -1058,7 +1058,7 @@ function ZoomControls({
       <button
         onClick={onZoomOut}
         className="inline-flex items-center justify-center size-7 rounded text-secondary hover:bg-hover hover:text-primary"
-        title="Zoom out (⌘−)"
+        title="Zoom out (Cmd−)"
         aria-label="Zoom out"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -1068,7 +1068,7 @@ function ZoomControls({
       <button
         onClick={onReset}
         className="px-1.5 py-0.5 rounded text-secondary hover:bg-hover hover:text-primary tabular-nums min-w-[3.5rem]"
-        title="Reset zoom (⌘0)"
+        title="Reset zoom (Cmd0)"
         aria-label="Reset zoom"
       >
         {pct}%
@@ -1076,7 +1076,7 @@ function ZoomControls({
       <button
         onClick={onZoomIn}
         className="inline-flex items-center justify-center size-7 rounded text-secondary hover:bg-hover hover:text-primary"
-        title="Zoom in (⌘+)"
+        title="Zoom in (Cmd+)"
         aria-label="Zoom in"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -1099,7 +1099,7 @@ function ZoomControls({
   );
 }
 
-// Icons — kept inline so the bundle doesn't grow for one component.
+// Icons - kept inline so the bundle doesn't grow for one component.
 function NoteIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

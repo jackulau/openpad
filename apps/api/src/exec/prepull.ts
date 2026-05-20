@@ -64,10 +64,10 @@ export async function prepullImages(deps: PrepullDeps = {}): Promise<PrepullResu
       const dt = Date.now() - t0;
       if (ok) {
         pulled.push(image);
-        log(`✓ ${image} (${dt}ms)`);
+        log(`[OK] ${image} (${dt}ms)`);
       } else {
         failed.push(image);
-        log(`✗ ${image} (${dt}ms)`);
+        log(`[FAIL] ${image} (${dt}ms)`);
       }
     }
   };

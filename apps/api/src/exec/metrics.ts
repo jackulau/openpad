@@ -1,5 +1,5 @@
 // Process-wide exec metrics + per-pad concurrency tracking. Plain in-memory
-// counters — no Prometheus dependency, no histograms. Exposed via
+// counters - no Prometheus dependency, no histograms. Exposed via
 // /api/admin/exec-metrics for ad-hoc inspection.
 
 import { env } from '../env.js';

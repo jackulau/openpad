@@ -9,7 +9,7 @@ const WHITEBOARD_NAME = '_whiteboard.draw';
 const WHITEBOARD_LANGUAGE = 'whiteboard';
 
 export async function registerWhiteboardRoutes(server: FastifyInstance): Promise<void> {
-  // GET /api/pads/:slug/whiteboard — return the whiteboard fileId, creating
+  // GET /api/pads/:slug/whiteboard - return the whiteboard fileId, creating
   // it lazily on first access. Idempotent.
   server.get(
     '/:slug/whiteboard',

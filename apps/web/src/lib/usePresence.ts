@@ -48,7 +48,7 @@ export function useLivePresence(): Record<string, number> {
                 const parsed = JSON.parse(data) as Record<string, number>;
                 if (!cancelled) setCounts(parsed);
               } catch {
-                /* malformed frame — ignore */
+                /* malformed frame - ignore */
               }
             }
           }

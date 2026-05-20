@@ -34,7 +34,7 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
           className="text-subtle hover:text-secondary text-xs shrink-0 mt-0.5"
           aria-label="Dismiss notification"
         >
-          ✕
+          x
         </button>
       </div>
     </div>

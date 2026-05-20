@@ -69,7 +69,7 @@ export class ContainerPool {
     return [...this.langIds];
   }
 
-  // Spawn `size` containers per lang. Caller should NOT await — runs in
+  // Spawn `size` containers per lang. Caller should NOT await - runs in
   // background while server.listen() returns. Acquire calls return null until
   // containers are 'ready'; runner falls back to cold runs in the meantime.
   async start(): Promise<void> {
@@ -158,7 +158,7 @@ export class ContainerPool {
   private async spawnSlot(langId: string): Promise<void> {
     const lang = LANGUAGES[langId];
     if (!lang?.docker) {
-      this.log(`lang ${langId} has no docker config — skipping pool slot`);
+      this.log(`lang ${langId} has no docker config - skipping pool slot`);
       return;
     }
     const placeholder: PooledContainer = {
@@ -190,7 +190,7 @@ export class ContainerPool {
     try {
       await this.runDockerGetStdout('docker', ['rm', '-f', containerId]);
     } catch {
-      // best effort — container may already be gone
+      // best effort - container may already be gone
     }
   }
 
@@ -226,7 +226,7 @@ export class ContainerPool {
   }
 }
 
-// Pure builder — exported for unit tests.
+// Pure builder - exported for unit tests.
 export function buildPoolContainerArgs(lang: LanguageSpec): string[] {
   if (!lang.docker) throw new Error(`language ${lang.id} has no docker image`);
   return [

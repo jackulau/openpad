@@ -119,7 +119,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
 
     const [files, members] = await Promise.all([
       // Whiteboard lives as a synthetic PadFile keyed by language="whiteboard".
-      // Hide it from the regular files tree — the dedicated /whiteboard route
+      // Hide it from the regular files tree - the dedicated /whiteboard route
       // is how clients discover it.
       prisma.padFile.findMany({
         where: { padId: access.pad.id, NOT: { language: 'whiteboard' } },
@@ -225,7 +225,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     return { ok: true, hasPassword: !!data.passwordHash };
   });
 
-  // Unlock pad with password — joins the calling user as the pad's passwordRole
+  // Unlock pad with password - joins the calling user as the pad's passwordRole
   server.post('/:slug/unlock', { preHandler: server.requireAuth }, async (req, reply) => {
     const { slug } = req.params as { slug: string };
     const userId = req.currentUser!.sub;
@@ -248,7 +248,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     return { ok: true, slug, role: pad.passwordRole };
   });
 
-  // Fork pad — copy all files into a new pad owned by the caller.
+  // Fork pad - copy all files into a new pad owned by the caller.
   server.post('/:slug/fork', { preHandler: server.requireAuth }, async (req, reply) => {
     const { slug } = req.params as { slug: string };
     const userId = req.currentUser!.sub;
@@ -292,7 +292,7 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     return reply.code(201).send({ pad: summarize(fork, 'owner') });
   });
 
-  // Patch packages config — owner only.
+  // Patch packages config - owner only.
   server.patch('/:slug/packages', { preHandler: server.requireAuth }, async (req, reply) => {
     const { slug } = req.params as { slug: string };
     const userId = req.currentUser!.sub;

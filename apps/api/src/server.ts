@@ -35,7 +35,7 @@ import { registerWebSocket } from './ws/index.js';
 export type AppServer = FastifyInstance;
 
 // CSP is tuned so Monaco (WebWorkers via blob:) and xterm (WASM + blob workers)
-// still load. HSTS is preload-friendly but only emitted when behind HTTPS — the
+// still load. HSTS is preload-friendly but only emitted when behind HTTPS - the
 // dev server is HTTP and operators terminating TLS at a reverse proxy can flip it
 // on with ENABLE_HSTS=1.
 function buildHelmetOptions(): Parameters<typeof helmet>[1] {

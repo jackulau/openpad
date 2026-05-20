@@ -3,9 +3,9 @@ import { prisma } from '../db.js';
 import { getExecCounters } from '../exec/metrics.js';
 import { getPool } from '../exec/pool.js';
 
-// GET /api/admin/exec-metrics — returns process-wide exec counters + pool
+// GET /api/admin/exec-metrics - returns process-wide exec counters + pool
 // state. Access gate: caller must be the owner of at least one pad. This is a
-// lightweight auth check, NOT a real admin system — the metrics are not
+// lightweight auth check, NOT a real admin system - the metrics are not
 // sensitive (counts only, no payloads) but we don't expose them anonymously.
 
 export async function registerExecMetricsRoutes(server: FastifyInstance): Promise<void> {

@@ -24,7 +24,7 @@ export function FileTree({
   myUserId,
 }: Props) {
   // Group remote users by the file they're currently viewing so each file row
-  // can show a small stack of colored dots — same affordance as Google Docs
+  // can show a small stack of colored dots - same affordance as Google Docs
   // "who's on this doc" indicators, but per file.
   const viewersByFile = useMemo(() => {
     const map = new Map<string, PresenceUser[]>();
@@ -179,7 +179,7 @@ export function FileTree({
                       }}
                       title="Delete"
                     >
-                      ✕
+                      x
                     </button>
                   )}
                 </div>

@@ -20,7 +20,7 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
       .object({
         name: z.string().trim().min(1).max(80),
         // Optional stable email used by integration tests for cross-lookup.
-        // Never sent by the UI — the user always sees a name-only form.
+        // Never sent by the UI - the user always sees a name-only form.
         email: z.string().email().max(254).optional(),
       })
       .safeParse(req.body ?? {});
@@ -60,7 +60,7 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     };
   });
 
-  // PATCH /me — change display name. No password concept since auth is
+  // PATCH /me - change display name. No password concept since auth is
   // name-only.
   server.patch('/me', { preHandler: server.requireAuth }, async (req, reply) => {
     const parsed = z
@@ -87,7 +87,7 @@ export async function registerAuthRoutes(server: FastifyInstance): Promise<void>
     };
   });
 
-  // DELETE /me — destroy the account and all owned content. Confirm-only;
+  // DELETE /me - destroy the account and all owned content. Confirm-only;
   // there is no password to re-prompt with.
   server.delete('/me', { preHandler: server.requireAuth }, async (req, reply) => {
     const parsed = z

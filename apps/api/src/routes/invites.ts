@@ -23,9 +23,9 @@ const DEFAULT_PUBLIC_BASE = 'http://localhost:4000';
 // Pick the base URL for invite links.
 //
 // Priority:
-//   1. Explicit PUBLIC_BASE_URL env override (non-default) — operator-canonical
+// 1. Explicit PUBLIC_BASE_URL env override (non-default) - operator-canonical
 //      URL, e.g. behind a fixed reverse-proxy hostname.
-//   2. Request host (with x-forwarded-host honored under trustProxy) — so a
+// 2. Request host (with x-forwarded-host honored under trustProxy) - so a
 //      friend who opens the app at http://192.168.1.x:4000 gets an invite link
 //      pointed at the same LAN IP. Zero-config for LAN.
 //   3. Fall back to the env default.
@@ -265,7 +265,7 @@ export async function registerInviteRoutes(server: FastifyInstance): Promise<voi
 }
 
 export async function registerInviteAcceptRoutes(server: FastifyInstance): Promise<void> {
-  // GET /api/invites/:token — preview (no auth needed; returns sanitized info)
+  // GET /api/invites/:token - preview (no auth needed; returns sanitized info)
   server.get('/:token', async (req, reply) => {
     const { token } = req.params as { token: string };
     const inv = await prisma.invite.findUnique({

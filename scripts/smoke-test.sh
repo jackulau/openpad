@@ -78,6 +78,6 @@ if [[ "$OUT" != "5" ]]; then
   cat "$DATA_DIR/api.log"
   exit 1
 fi
-echo "    stdout: 5 ✓"
+echo " stdout: 5 [OK]"
 
 echo "==> smoke test PASSED"

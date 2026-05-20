@@ -75,7 +75,7 @@ export async function registerPresenceRoutes(server: FastifyInstance): Promise<v
       // Hold the connection open. Fastify's reply lifecycle wants a return
       // value; an unresolved promise keeps it from finalising the response.
       return new Promise<void>(() => {
-        /* never resolves — connection ends on client close */
+        /* never resolves - connection ends on client close */
       });
     },
   );

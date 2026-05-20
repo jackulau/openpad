@@ -23,7 +23,7 @@ export function App() {
       <CommandPalette />
       <Routes>
         <Route path="/" element={<Landing />} />
-        {/* Legacy auth routes redirect to landing — only /guest auth exists now. */}
+        {/* Legacy auth routes redirect to landing - only /guest auth exists now. */}
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="/register" element={<Navigate to="/" replace />} />
         <Route

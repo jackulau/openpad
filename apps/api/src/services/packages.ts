@@ -21,7 +21,7 @@ export function parsePackages(raw: string | null | undefined): PadPackages {
 /**
  * Build a shell prefix that installs the requested package set before exec.
  * Returns empty string when no packages match the language. Quotes each
- * package name with single quotes — shell injection mitigation since pkg
+ * package name with single quotes - shell injection mitigation since pkg
  * names are user-provided.
  */
 export function installCommandFor(languageId: string, packages: PadPackages): string {

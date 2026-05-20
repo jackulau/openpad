@@ -32,7 +32,7 @@ export function RunOutput({ slug, streamReq, result, onStreamEnd }: Props) {
 
   useEffect(() => {
     if (!slug || !streamReq) return;
-    // dedupe — React strict-mode runs effects twice; only run the same payload once.
+    // dedupe - React strict-mode runs effects twice; only run the same payload once.
     const key = JSON.stringify({ slug, ...streamReq });
     if (startedRef.current === key) return;
     startedRef.current = key;
@@ -86,7 +86,7 @@ export function RunOutput({ slug, streamReq, result, onStreamEnd }: Props) {
       )}
       {!streaming && !shown && (
         <div className="text-subtle">
-          Press <kbd className="kbd">⌘</kbd>
+          Press <kbd className="kbd">Cmd</kbd>
           <kbd className="kbd">↵</kbd> to run.
         </div>
       )}
@@ -98,7 +98,7 @@ export function RunOutput({ slug, streamReq, result, onStreamEnd }: Props) {
               <span
                 className={`chip ${shown.exitCode === 0 && !shown.timedOut ? 'chip-success' : 'chip-danger'} !text-[11px]`}
               >
-                {shown.exitCode === 0 && !shown.timedOut ? '✓ exit 0' : `exit ${String(shown.exitCode)}`}
+                {shown.exitCode === 0 && !shown.timedOut ? '[OK] exit 0' : `exit ${String(shown.exitCode)}`}
               </span>
               <span className="chip">{shown.durationMs}ms</span>
               <span className="chip">stream</span>

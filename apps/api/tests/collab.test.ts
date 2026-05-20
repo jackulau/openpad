@@ -205,7 +205,7 @@ describe('collab WS', () => {
     expect(parsed.userId).toBeTruthy();
     expect(parsed.color).toMatch(/^#/);
 
-    // Late joiner Carol — replay should fire on HELLO so she sees Alice's cursor.
+    // Late joiner Carol - replay should fire on HELLO so she sees Alice's cursor.
     const c = await open(slug, tokenC);
     c.ws.send(encodeJSON(MSG.HELLO, { fileId }));
     // Carol should see two messages: STATE (file) then AWARENESS (Alice's cached cursor).

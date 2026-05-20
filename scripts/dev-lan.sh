@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch API + web bound to LAN. Friends connect at http://<your-ip>:5173 — no password, just pick a name.
+# Launch API + web bound to LAN. Friends connect at http://<your-ip>:5173 - no password, just pick a name.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -7,7 +7,7 @@ ROOT="$(pwd)"
 
 LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
 if [ -z "${LAN_IP:-}" ]; then
-  echo "could not detect LAN IP — set LAN_IP=... manually" >&2
+  echo "could not detect LAN IP - set LAN_IP=... manually" >&2
   exit 1
 fi
 
@@ -39,7 +39,7 @@ echo "========================================================"
 echo "  opencoder running"
 echo "  you:       http://localhost:5173"
 echo "  friends:   $PUBLIC_URL"
-echo "  share that URL with anyone on your wifi — they pick a name and join"
+echo " share that URL with anyone on your wifi - they pick a name and join"
 echo "  Ctrl-C to stop"
 echo "========================================================"
 echo

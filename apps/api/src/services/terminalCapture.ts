@@ -6,7 +6,7 @@ import { prisma } from '../db.js';
 // Batching strategy: flush whenever the in-memory buffer reaches FLUSH_BYTES,
 // or 500ms passes since the first un-flushed fragment, whichever comes first.
 // A hard SESSION_CAP_BYTES limit prevents a noisy terminal from ballooning
-// the recording — once hit, capture stops and a "[…truncated]" marker is
+// the recording - once hit, capture stops and a "[…truncated]" marker is
 // flushed with meta.truncated=true.
 
 const FLUSH_INTERVAL_MS = 500;
@@ -26,7 +26,7 @@ interface CaptureOpts {
   flushBufferBytes?: number;
   /** Override for tests. */
   sessionCapBytes?: number;
-  /** Test seam — bypass DB write. */
+  /** Test seam - bypass DB write. */
   persist?: (rows: TermFragment[], meta: { truncated: boolean }) => Promise<void>;
 }
 
@@ -112,7 +112,7 @@ export class TerminalCapture {
     try {
       await this.persistFn(batch, meta);
     } catch {
-      // best-effort — capture errors must never disrupt the live terminal
+      // best-effort - capture errors must never disrupt the live terminal
     }
   }
 

@@ -184,7 +184,7 @@ export function Dashboard() {
                   <div className="flex items-center gap-2">
                     <span className="chip chip-accent">{p.myRole}</span>
                     <span className="chip">{p.kind}</span>
-                    {p.hasPassword && <span className="chip">🔒</span>}
+                    {p.hasPassword && <span className="chip"></span>}
                     {p.autoRecord && <span className="chip">● rec</span>}
                   </div>
                 </button>

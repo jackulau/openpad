@@ -3,7 +3,7 @@ import type { SpawnOptions, ChildProcess } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import { prepullImages, uniqueImages } from '../src/exec/prepull.js';
 
-// Minimal stub child process — emits exit with the configured code.
+// Minimal stub child process - emits exit with the configured code.
 function makeStubChild(exitCode: number): ChildProcess {
   const child = new EventEmitter() as unknown as ChildProcess;
   setImmediate(() => child.emit('exit', exitCode, null));

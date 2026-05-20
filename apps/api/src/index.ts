@@ -20,7 +20,7 @@ const start = async () => {
     await server.listen({ host: env.HOST, port: env.PORT });
     server.log.info({ url: `http://${env.HOST}:${env.PORT}` }, 'opencoder api listening');
     // Pre-pull docker images in the background so the first /run isn't a long
-    // image fetch. Non-blocking — listen is already up. Failures are logged but
+    // image fetch. Non-blocking - listen is already up. Failures are logged but
     // don't crash the server (cold pull still happens on demand).
     void prepullImages({
       log: (m: string) => server.log.info({ scope: 'exec/prepull' }, m),
@@ -28,7 +28,7 @@ const start = async () => {
       .then(() => {
         // Start the warm container pool only after images are present.
         // Pool.start() runs `docker run -d`, which would itself pull the image
-        // if missing — but pre-pull deduplicates network fetch + makes the
+        // if missing - but pre-pull deduplicates network fetch + makes the
         // first acquire faster.
         const pool = getPool();
         return pool

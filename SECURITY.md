@@ -20,7 +20,7 @@ opencoder is designed for these deployment shapes, in increasing order of risk:
 
 The default configuration targets **shape 2**. Operators choosing shape 4 must
 explicitly opt into stricter settings (HSTS, locked CORS, password-protect every
-pad, etc.) — see "Hardening for Public Exposure" below.
+pad, etc.) - see "Hardening for Public Exposure" below.
 
 opencoder is **not** designed to defend against a sophisticated attacker who has
 direct code-execution access to the host. The Docker sandbox protects the host
@@ -79,7 +79,7 @@ with Docker available. The fallback exists for development convenience only.
 - Passwords are hashed with **bcrypt** (10 rounds). Comparison is constant-time
   (`bcrypt.compare`).
 - Sessions are **JWT bearer tokens**, signed with a secret loaded from
-  `JWT_SECRET`. Tokens expire after 7 days. There is no refresh endpoint —
+  `JWT_SECRET`. Tokens expire after 7 days. There is no refresh endpoint -
   tokens must be re-issued via login.
 - Tokens are stored client-side in `localStorage` and additionally set as an
   `httpOnly`, `SameSite=Lax` cookie, so they survive page reloads and ride
@@ -95,7 +95,7 @@ with Docker available. The fallback exists for development convenience only.
 | `POST /api/auth/guest`  | 10                         |
 | Everything else (global) | `RATE_LIMIT_PER_MINUTE` (default 120) |
 
-Auth is name-only — there is no password or email-login surface to brute-force.
+Auth is name-only - there is no password or email-login surface to brute-force.
 Account events (signup, name change, deletion) are recorded in the **audit log**
 (`AuditLog` table).
 
@@ -103,10 +103,10 @@ Account events (signup, name change, deletion) are recorded in the **audit log**
 
 Responses ship with the following headers (via `@fastify/helmet`):
 
-- `Content-Security-Policy` — restricts script, worker, image, font, and
+- `Content-Security-Policy` - restricts script, worker, image, font, and
   connect sources. `worker-src` and `script-src` allow `blob:` because Monaco
   and xterm require it.
-- `X-Frame-Options: DENY` — blocks framing (clickjacking defense).
+- `X-Frame-Options: DENY` - blocks framing (clickjacking defense).
 - `Referrer-Policy: no-referrer`.
 - `X-Content-Type-Options: nosniff`.
 - `Cross-Origin-Opener-Policy: same-origin`.
@@ -135,12 +135,12 @@ The `AuditLog` table records every:
 
 Each entry stores `userId`, `action`, `target`, `ip`, `userAgent`, optional
 metadata, and a timestamp. The log is append-only; there is no UI surface for
-viewing it (intentional — operators query the database directly).
+viewing it (intentional - operators query the database directly).
 
 ## Pad Password Gates
 
 Pads can be password-protected. The password is **bcrypt-hashed** the same way
-account passwords are. Unlock attempts are not rate-limited per pad today — for
+account passwords are. Unlock attempts are not rate-limited per pad today - for
 public-internet exposure, operators should put the entire deployment behind a
 reverse proxy with IP-based throttling.
 

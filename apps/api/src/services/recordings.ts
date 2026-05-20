@@ -33,7 +33,7 @@ export async function onParticipantJoin(
   if (!pad?.autoRecord) return;
   let rec = active.get(padId);
   if (rec) {
-    // Recording still open from an earlier session — cancel the idle close,
+    // Recording still open from an earlier session - cancel the idle close,
     // append this participant to the roster.
     if (rec.idleTimer) {
       clearTimeout(rec.idleTimer);
@@ -69,7 +69,7 @@ export async function onParticipantLeave(
   const rec = active.get(padId);
   if (!rec) return;
   if (remainingCount > 0) return;
-  // Last participant left — wait IDLE_BEFORE_STOP_MS before closing in case
+  // Last participant left - wait IDLE_BEFORE_STOP_MS before closing in case
   // someone reloads or rejoins quickly.
   if (rec.idleTimer) clearTimeout(rec.idleTimer);
   rec.idleTimer = setTimeout(() => {
@@ -94,7 +94,7 @@ async function closeRecording(padId: string, reason: 'idle' | 'manual' | 'shutdo
       },
     })
     .catch(() => {
-      /* row may have been deleted manually — ignore */
+      /* row may have been deleted manually - ignore */
     });
   recordAudit({
     action: 'recording.stop',

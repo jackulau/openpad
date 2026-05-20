@@ -1,4 +1,4 @@
-# opencoder — single-host self-deployment
+# opencoder - single-host self-deployment
 #
 # Pick the port you want to share with friends (defaults to 4000),
 # point a secret JWT at it, optionally wire an AI key, and run
@@ -22,7 +22,7 @@ services:
       HOST: "0.0.0.0"
       # Required. Refuses to start if unset / empty. Generate with:
       #   openssl rand -hex 32
-      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env — generate with: openssl rand -hex 32}"
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set in .env - generate with: openssl rand -hex 32}"
       PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:4000}"
       DATABASE_URL: "${DATABASE_URL:-file:/data/opencoder.db}"
       DATA_DIR: "/data"

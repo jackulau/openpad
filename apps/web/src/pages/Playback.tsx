@@ -164,7 +164,7 @@ export function Playback() {
                 onClick={() => setPlaying((p) => !p)}
                 disabled={max === 0}
               >
-                {playing ? '⏸ Pause' : '▶ Play'}
+                {playing ? ' Pause' : '▶ Play'}
               </button>
               <select
                 className="input !py-1 !text-sm w-20"

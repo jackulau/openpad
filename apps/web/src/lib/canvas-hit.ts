@@ -82,7 +82,7 @@ export function strokeBounds(s: Stroke): Bounds {
       maxY: Math.max(s.y, s.y + s.h),
     };
   }
-  // text: width ~ length * 9, height ~ 18 — coarse but good enough for select
+  // text: width ~ length * 9, height ~ 18 - coarse but good enough for select
   const w = s.text.length * 9;
   return { minX: s.x - 4, minY: s.y - 18, maxX: s.x + w, maxY: s.y + 4 };
 }
@@ -178,7 +178,7 @@ function distToSegment(
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-// Translate every coordinate in the stroke by (dx, dy). Pure — returns a new
+// Translate every coordinate in the stroke by (dx, dy). Pure - returns a new
 // stroke with the same id.
 export function moveStroke(s: Stroke, dx: number, dy: number): Stroke {
   if (s.kind === 'pen') {

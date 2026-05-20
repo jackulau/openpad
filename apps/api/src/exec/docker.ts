@@ -37,7 +37,7 @@ export function resetDockerCache(): void {
 }
 
 // Pure builder so the sandbox flags can be unit-tested without invoking docker.
-// Order is significant — keep flags grouped (rm/io → network → fs → caps → resources).
+// Order is significant - keep flags grouped (rm/io → network → fs → caps → resources).
 export function buildDockerArgs(
   lang: LanguageSpec,
   sandboxDir: string,

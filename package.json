@@ -2,7 +2,7 @@
   "name": "opencoder",
   "version": "0.1.0",
   "private": true,
-  "description": "Self-hosted collaborative coding pads for friends — a CoderPad-style multi-language IDE with realtime collab, terminal, interview rooms, code playback, and AI review.",
+  "description": "Self-hosted collaborative coding pads for friends - a CoderPad-style multi-language IDE with realtime collab, terminal, interview rooms, code playback, and AI review.",
   "license": "MIT",
   "packageManager": "pnpm@10.12.4",
   "engines": {

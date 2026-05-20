@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/smoke.sh — end-to-end smoke test for opencoder.
+# scripts/smoke.sh - end-to-end smoke test for opencoder.
 # Boots the api, registers a guest, creates a pad, runs JS that prints 42.
 # Exits 0 if every step works, non-zero with a clear log otherwise.
 
@@ -22,7 +22,7 @@ cleanup() {
   rm -f "$DB_PATH" "$DB_PATH-journal"
   if (( code != 0 )); then
     echo
-    echo "✗ smoke failed (exit $code). Server log:"
+    echo "[FAIL] smoke failed (exit $code). Server log:"
     sed 's/^/    /' "$LOG_FILE" | tail -50
   fi
   rm -f "$LOG_FILE"
@@ -31,8 +31,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 step() { printf "→ %s\n" "$1"; }
-ok()   { printf "  ✓ %s\n" "$1"; }
-fail() { printf "  ✗ %s\n" "$1" >&2; exit 1; }
+ok() { printf " [OK] %s\n" "$1"; }
+fail() { printf " [FAIL] %s\n" "$1" >&2; exit 1; }
 
 step "applying migrations to $DB_PATH"
 (
@@ -95,4 +95,4 @@ fi
 ok "exec stdout=42"
 
 echo
-echo "✓ smoke passed"
+echo "[OK] smoke passed"

@@ -17,7 +17,7 @@ const attachBody = z.object({
 });
 
 export async function registerInterviewRoutes(server: FastifyInstance): Promise<void> {
-  // GET interview details — interviewer sees full; candidate only sees question
+  // GET interview details - interviewer sees full; candidate only sees question
   server.get(
     '/:slug/interview',
     { preHandler: server.requireAuth },
@@ -68,7 +68,7 @@ export async function registerInterviewRoutes(server: FastifyInstance): Promise<
     },
   );
 
-  // PATCH score — interviewer (owner) only
+  // PATCH score - interviewer (owner) only
   server.patch(
     '/:slug/interview/score',
     { preHandler: server.requireAuth },
@@ -113,7 +113,7 @@ export async function registerInterviewRoutes(server: FastifyInstance): Promise<
     },
   );
 
-  // Attach a question — interviewer (owner) only
+  // Attach a question - interviewer (owner) only
   server.post(
     '/:slug/interview/attach',
     { preHandler: server.requireAuth },

@@ -38,7 +38,7 @@ beforeEach(async () => {
 });
 
 describe('pad fork', () => {
-  it('owner forks own pad — gets a new pad with copied files', async () => {
+  it('owner forks own pad - gets a new pad with copied files', async () => {
     // add a second file to the original
     await server.inject({
       method: 'POST',

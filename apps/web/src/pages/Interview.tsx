@@ -138,7 +138,7 @@ export function Interview() {
           )}
         </section>
 
-        {/* Whiteboard for system design sketches — shared across all roles
+        {/* Whiteboard for system design sketches - shared across all roles
             so candidate + interviewer can sketch boxes / arrows / labels
             during system-design rounds. */}
         <section className="card p-0 lg:col-span-2 flex flex-col" style={{ minHeight: 480 }}>

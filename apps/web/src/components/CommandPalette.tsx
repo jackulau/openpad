@@ -13,7 +13,7 @@ interface Action {
   run: () => void | Promise<void>;
 }
 
-// Global ⌘K / Ctrl+K palette: jump to pad, create pad, toggle theme, settings,
+// Global CmdK / Ctrl+K palette: jump to pad, create pad, toggle theme, settings,
 // sign out. Lazy-loads pad list when opened so the network call is paid only
 // when needed.
 export function CommandPalette() {
@@ -25,7 +25,7 @@ export function CommandPalette() {
   const { theme, toggle } = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Global keybinding (⌘K / Ctrl+K).
+  // Global keybinding (CmdK / Ctrl+K).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {

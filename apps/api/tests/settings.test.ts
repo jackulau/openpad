@@ -25,7 +25,7 @@ beforeEach(async () => {
   token = r.json().token;
 });
 
-describe('settings — PATCH /me', () => {
+describe('settings - PATCH /me', () => {
   it('changes name', async () => {
     const res = await server.inject({
       method: 'PATCH',
@@ -48,7 +48,7 @@ describe('settings — PATCH /me', () => {
   });
 });
 
-describe('settings — DELETE /me', () => {
+describe('settings - DELETE /me', () => {
   it('deletes account with confirm token', async () => {
     const res = await server.inject({
       method: 'DELETE',

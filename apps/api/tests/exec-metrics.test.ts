@@ -102,7 +102,7 @@ describe('exec-metrics: /api/admin/exec-metrics access gate', () => {
 describe('exec-metrics: per-pad concurrency cap', () => {
   it('rejects the 6th in-flight run with 429 too_many_runs', async () => {
     // Fire 6 sleep(0.6) python runs at once; first 5 admitted, 6th gets 429.
-    // We need them in-flight simultaneously — kick off 6 inject promises and
+    // We need them in-flight simultaneously - kick off 6 inject promises and
     // race their responses.
     const payload = {
       source: 'import time; time.sleep(0.6); print("done")',

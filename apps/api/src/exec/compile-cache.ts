@@ -13,7 +13,7 @@ import { env } from '../env.js';
 //   <root>/<hash>/artifact.bin
 //
 // Eviction: when total size exceeds EXEC_COMPILE_CACHE_MAX_MB, oldest entries
-// (by mtime) are removed until below cap. No persistence — restart starts
+// (by mtime) are removed until below cap. No persistence - restart starts
 // fresh. Stale entries from prior runs are pruned on first put().
 
 export interface CacheKeyInput {
@@ -52,7 +52,7 @@ export class CompileCache {
   }
 
   // Pure: same source+lang+version always yields same key. Hash is hex sha256
-  // truncated to 16 bytes (32 hex chars) — collision probability negligible
+  // truncated to 16 bytes (32 hex chars) - collision probability negligible
   // for any realistic cache size.
   static computeKey(input: CacheKeyInput): string {
     const h = createHash('sha256');
@@ -75,7 +75,7 @@ export class CompileCache {
       const now = Date.now();
       await writeFile(p + '.touch', '', { flag: 'w' }).catch(() => {});
       await rm(p + '.touch', { force: true }).catch(() => {});
-      // Update mtime on the actual file via utimes — simpler than touch dance:
+      // Update mtime on the actual file via utimes - simpler than touch dance:
       // but node 20+ utimes accepts seconds. Use a cheap re-write of an
       // adjacent marker file to act as an mtime bump on the parent dir.
       const dir = path.dirname(p);
@@ -114,7 +114,7 @@ export class CompileCache {
             entries.push({ key, path: p, sizeBytes: st.size, mtimeMs: st.mtimeMs });
           }
         } catch {
-          // entry without artifact.bin — orphan from interrupted put()
+          // entry without artifact.bin - orphan from interrupted put()
         }
       }
       entries.sort((a, b) => a.mtimeMs - b.mtimeMs);
@@ -161,7 +161,7 @@ export class CompileCache {
   }
 }
 
-// Module singleton — runner imports getCompileCache() to wire into pool path.
+// Module singleton - runner imports getCompileCache() to wire into pool path.
 let _cache: CompileCache | null = null;
 export function getCompileCache(): CompileCache {
   if (!_cache) _cache = new CompileCache();

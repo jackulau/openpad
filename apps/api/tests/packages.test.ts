@@ -46,7 +46,7 @@ describe('packages (unit)', () => {
 
   it('quotes safely against shell injection', () => {
     const cmd = installCommandFor('python312', { pip: ["evil; rm -rf /"] });
-    // The whole value lives inside a single-quoted string — no unquoted ;rm.
+    // The whole value lives inside a single-quoted string - no unquoted ;rm.
     expect(cmd).toContain("'evil; rm -rf /'");
     // Embedded single quote gets escaped as '\'' (close-quote, literal, reopen).
     const cmd2 = installCommandFor('python312', { pip: ["x'y"] });

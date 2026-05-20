@@ -26,7 +26,7 @@ export async function runCode(req: RunRequest): Promise<RunResult> {
   try {
     const docker = await isDockerAvailable();
     if (docker && lang.docker) {
-      // Try the warm pool first for hot languages — saves ~500-2000ms cold
+      // Try the warm pool first for hot languages - saves ~500-2000ms cold
       // start. Falls through to cold `docker run --rm` if no pooled slot is
       // ready (pool not started, exhausted, lang not pooled).
       const pool = getPool();

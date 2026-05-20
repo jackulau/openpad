@@ -309,7 +309,7 @@ export function Pad() {
             className="btn-primary !py-1.5 !px-3 inline-flex items-center gap-2"
             onClick={() => run.mutate()}
             disabled={!editAllowed || run.isPending}
-            title="Run code (⌘↵ / Ctrl+Enter)"
+            title="Run code (Cmd↵ / Ctrl+Enter)"
           >
             {run.isPending ? (
               <>
@@ -320,7 +320,7 @@ export function Pad() {
               <>
                 <PlayIcon />
                 <span>Run</span>
-                <kbd className="kbd !bg-accent-fg/15 !text-accent-fg !border-accent-fg/30">⌘↵</kbd>
+                <kbd className="kbd !bg-accent-fg/15 !text-accent-fg !border-accent-fg/30">Cmd↵</kbd>
               </>
             )}
           </button>

@@ -2,7 +2,7 @@
 # Pre-pull docker images for opencoder language runners.
 #
 # Invoked optionally from docker-compose or `pnpm predev` so first-time users
-# don't pay a 30s image-fetch on their first /run. Idempotent — re-runs are
+# don't pay a 30s image-fetch on their first /run. Idempotent - re-runs are
 # cheap once images are cached locally.
 #
 # SOURCE OF TRUTH: packages/shared/src/languages.ts (LANGUAGES.*.docker.image).
@@ -13,11 +13,11 @@
 set -euo pipefail
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "[prepull] docker not found — skipping"
+  echo "[prepull] docker not found - skipping"
   exit 0
 fi
 if ! docker version --format '{{.Server.Version}}' >/dev/null 2>&1; then
-  echo "[prepull] docker daemon not reachable — skipping"
+  echo "[prepull] docker daemon not reachable - skipping"
   exit 0
 fi
 
@@ -66,9 +66,9 @@ started=$(date +%s)
 printf '%s\n' "${unique[@]}" | xargs -n1 -P5 -I{} sh -c '
   img="{}"
   if docker pull --quiet "$img" >/dev/null 2>&1; then
-    echo "[prepull] ✓ $img"
+    echo "[prepull] [OK] $img"
   else
-    echo "[prepull] ✗ $img"
+    echo "[prepull] [FAIL] $img"
   fi
 '
 ended=$(date +%s)

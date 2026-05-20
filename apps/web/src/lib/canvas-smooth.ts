@@ -1,6 +1,6 @@
 // Pure helpers for pen smoothing + render perf. No React deps.
 //
-//   rdpSimplify: Ramer-Douglas-Peucker — drops collinear points within an
+// rdpSimplify: Ramer-Douglas-Peucker - drops collinear points within an
 //     epsilon-tolerance distance from the simplified line. Cuts stroke
 //     payload size by 50-90% for finger/mouse trails without visible loss.
 //

@@ -73,7 +73,7 @@ export function Editor({
   // Paint remote cursors + selections as Monaco decorations, with a content
   // widget per user that floats their name label above the caret. Per-user
   // colors get inlined into a shared <style> tag because Monaco decorations
-  // can't carry inline styles directly — only className references.
+  // can't carry inline styles directly - only className references.
   useEffect(() => {
     const editor = editorRef.current;
     const monaco = monacoRef.current;

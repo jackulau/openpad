@@ -64,6 +64,13 @@ interface ThemeState {
   setEditorTheme: (t: EditorTheme) => void;
 }
 
+// When the user toggles app dark/light, also flip the editor theme - but only
+// if they haven't picked a non-default one. Once they explicitly set an editor
+// theme via Settings, EDITOR_KEY is in localStorage and we leave it alone.
+function autoEditorFor(mode: Theme): EditorTheme {
+  return mode === 'light' ? 'opencoder-light' : 'opencoder-dark';
+}
+
 export const useTheme = create<ThemeState>((set) => {
   const initialTheme = readInitialTheme();
   const initialEditor = readInitialEditorTheme(initialTheme);
@@ -74,14 +81,18 @@ export const useTheme = create<ThemeState>((set) => {
     setTheme: (t) => {
       localStorage.setItem(THEME_KEY, t);
       applyTheme(t);
-      set({ theme: t });
+      const userPicked = localStorage.getItem(EDITOR_KEY) != null;
+      set(userPicked ? { theme: t } : { theme: t, editorTheme: autoEditorFor(t) });
     },
     toggle: () =>
       set((s) => {
         const next: Theme = s.theme === 'dark' ? 'light' : 'dark';
         localStorage.setItem(THEME_KEY, next);
         applyTheme(next);
-        return { theme: next };
+        const userPicked = localStorage.getItem(EDITOR_KEY) != null;
+        return userPicked
+          ? { theme: next }
+          : { theme: next, editorTheme: autoEditorFor(next) };
       }),
     setEditorTheme: (t) => {
       localStorage.setItem(EDITOR_KEY, t);

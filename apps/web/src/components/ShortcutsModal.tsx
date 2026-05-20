@@ -8,10 +8,10 @@ interface Shortcut {
 
 const SHORTCUTS: Shortcut[] = [
   { keys: ['?'], description: 'Open this shortcut help', scope: 'global' },
-  { keys: ['⌘', '↵'], description: 'Run code', scope: 'pad' },
+  { keys: ['Cmd', '↵'], description: 'Run code', scope: 'pad' },
   { keys: ['Ctrl', '↵'], description: 'Run code (Linux/Windows)', scope: 'pad' },
   { keys: ['Esc'], description: 'Close any open modal', scope: 'global' },
-  { keys: ['⌘', 'K'], description: 'Quick switch (focus pad list)', scope: 'dashboard' },
+  { keys: ['Cmd', 'K'], description: 'Quick switch (focus pad list)', scope: 'dashboard' },
 ];
 
 export function useShortcutsModal(): {

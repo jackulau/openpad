@@ -16,7 +16,7 @@ export function useCollab(slug: string | undefined): {
   // CollabClient owns a WebSocket, so we create + tear it down inside the
   // effect (not in useMemo). React 18 StrictMode mounts effects twice in dev,
   // and a useMemo'd client would survive the first cleanup with a closed
-  // socket — leaving the UI permanently stuck at "closed". Doing it here lets
+  // socket - leaving the UI permanently stuck at "closed". Doing it here lets
   // the second mount instantiate a fresh client cleanly.
   const [client, setClient] = useState<CollabClient | null>(null);
   const [status, setStatus] = useState<CollabStatus>('connecting');

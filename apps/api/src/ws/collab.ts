@@ -170,7 +170,7 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
           }
           padMap.set(user.sub, { fileId, payload: stamped });
         } catch {
-          /* ignore — relay the raw payload so legacy clients still work */
+          /* ignore - relay the raw payload so legacy clients still work */
         }
         broadcast(access.pad.id, ws, encodeBinaryWithFile(MSG.AWARENESS, fileId, stamped));
         return;

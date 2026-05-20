@@ -183,7 +183,7 @@ async function flushDirty(): Promise<void> {
         st.dirty = false;
         st.lastFlush = Date.now();
       } catch (err) {
-        // ignore — flush is best-effort
+        // ignore - flush is best-effort
         void err;
       }
     }

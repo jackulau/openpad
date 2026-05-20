@@ -101,7 +101,7 @@ export async function registerFileRoutes(server: FastifyInstance): Promise<void>
   // swap its contents to the matching template *only if* the current content
   // matches a known template (i.e. the user hasn't actually typed real code).
   // Otherwise just rename + change the language column so the user's work is
-  // preserved. Also moves Yjs state forward by clearing yjsState — the editor
+  // preserved. Also moves Yjs state forward by clearing yjsState - the editor
   // will reseed from `content` on next mount.
   server.patch(
     '/:slug/files/:fileId/relanguage',
@@ -137,7 +137,7 @@ export async function registerFileRoutes(server: FastifyInstance): Promise<void>
         name = dot > 0 ? `${baseName.slice(0, dot)}-${i}${baseName.slice(dot)}` : `${baseName}-${i}`;
       }
       // Decide whether to overwrite content. We replace only when the existing
-      // content equals one of the known templates for the *old* language — that
+      // content equals one of the known templates for the *old* language - that
       // way someone who hasn't edited the file gets a fresh starter, and someone
       // mid-implementation keeps their work.
       const helloOld = templateFor(existing.language, 'hello');
