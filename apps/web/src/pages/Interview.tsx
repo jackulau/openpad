@@ -112,7 +112,7 @@ export function Interview() {
           ) : (
             <p className="text-secondary text-sm">
               {isInterviewer
-                ? 'No question attached yet — pick one below.'
+                ? 'No question attached yet. Pick one below.'
                 : 'Interviewer has not picked a question yet.'}
             </p>
           )}
@@ -126,7 +126,7 @@ export function Interview() {
                 value={question?.id ?? ''}
                 onChange={(e) => attach.mutate(e.target.value || null)}
               >
-                <option value="">— none —</option>
+                <option value="">(none)</option>
                 {myQuestions.data?.questions.map((q) => (
                   <option key={q.id} value={q.id}>
                     {q.title} ({q.difficulty})

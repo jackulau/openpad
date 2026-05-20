@@ -118,7 +118,7 @@ export function Playback() {
 
   const activeFile = tl.data.files.find((f) => f.id === activeFileId);
   const at = events[Math.max(0, scrubIndex - 1)];
-  const currentTime = at ? new Date(at.ts).toLocaleTimeString() : '—';
+  const currentTime = at ? new Date(at.ts).toLocaleTimeString() : '-';
 
   return (
     <div className="h-screen flex flex-col">

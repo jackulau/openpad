@@ -178,8 +178,8 @@ function PasswordSection({ slug }: { slug: string }) {
     <div className="space-y-2 border-t border-line pt-3">
       <h3 className="text-xs uppercase tracking-wide text-subtle">Password gate</h3>
       <p className="text-xs text-subtle">
-        Optional. Anyone with the link can join after entering this password —{' '}
-        {preview.data?.hasPassword ? 'currently enabled.' : 'currently disabled.'}
+        Optional. Anyone with the link can join after entering this password.{' '}
+        {preview.data?.hasPassword ? 'Currently enabled.' : 'Currently disabled.'}
       </p>
       <div className="grid sm:grid-cols-[1fr_auto_auto_auto] gap-2">
         <input

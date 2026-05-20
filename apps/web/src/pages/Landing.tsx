@@ -27,20 +27,13 @@ export function Landing() {
         <div className="flex justify-center pb-2">
           <Logo size={56} withText={false} />
         </div>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-line text-xs text-secondary">
-          <span
-            className="size-1.5 rounded-full bg-accent animate-pulse"
-            aria-hidden="true"
-          />
-          self-hosted · open source
-        </div>
         <h1 className="text-5xl font-semibold tracking-tight leading-[1.05]">
           Code together,{' '}
           <span className="text-accent">on your own port</span>.
         </h1>
         <p className="text-secondary leading-relaxed max-w-md mx-auto">
           Pick a name and start coding. No email, no password. Share the URL
-          with your friends — they pick a name too and join you.
+          with your friends. They pick a name too and join you.
         </p>
 
         <form

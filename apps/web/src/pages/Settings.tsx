@@ -75,7 +75,7 @@ export function Settings() {
             </button>
           </form>
           <p className="text-xs text-subtle">
-            No email or password — opencoder uses name-only signup. Your token lives in this browser only.
+            No email or password. opencoder uses name-only signup; your token lives in this browser only.
           </p>
         </section>
 

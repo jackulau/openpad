@@ -27,7 +27,7 @@ export const recordingsApi = {
 };
 
 export function fmtDuration(ms: number | null | undefined): string {
-  if (!ms || ms < 0) return '—';
+  if (!ms || ms < 0) return '-';
   const s = Math.round(ms / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
