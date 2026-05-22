@@ -75,6 +75,17 @@ describe('exec: runCode (unit, local fallback)', () => {
     expect(res.exitCode).toBe(127);
   });
 
+  it('bounds stdout to MAX_OUT even when child writes a huge chunk', async () => {
+    // Python writes 1 MB to stdout; capture must cap at 256 KB MAX_OUT.
+    const res = await runCode({
+      language: 'python',
+      source: 'import sys; sys.stdout.write("x" * (1024 * 1024)); sys.stdout.flush()',
+      timeoutMs: 10000,
+    });
+    expect(res.stdout.length).toBeLessThanOrEqual(256 * 1024);
+    expect(res.exitCode).toBe(0);
+  });
+
   it('shouldRefuseHostFallback returns true in production without EXEC_FORCE_LOCAL', async () => {
     const { shouldRefuseHostFallback } = await import('../src/exec/runner.js');
     const origEnv = process.env.NODE_ENV;

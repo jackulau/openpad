@@ -123,10 +123,16 @@ export function runProcess(
     }, timeoutMs);
 
     child.stdout.on('data', (chunk) => {
-      if (stdout.length < MAX_OUT) stdout += chunk.toString('utf8');
+      if (stdout.length >= MAX_OUT) return;
+      const remaining = MAX_OUT - stdout.length;
+      const str = chunk.toString('utf8');
+      stdout += str.length > remaining ? str.slice(0, remaining) : str;
     });
     child.stderr.on('data', (chunk) => {
-      if (stderr.length < MAX_OUT) stderr += chunk.toString('utf8');
+      if (stderr.length >= MAX_OUT) return;
+      const remaining = MAX_OUT - stderr.length;
+      const str = chunk.toString('utf8');
+      stderr += str.length > remaining ? str.slice(0, remaining) : str;
     });
     child.on('error', (err) => {
       clearTimeout(timer);
