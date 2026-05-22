@@ -66,3 +66,138 @@ describe('auth rate limits', () => {
     expect(okB.statusCode).toBe(201);
   });
 });
+
+describe('pad unlock brute-force throttle', () => {
+  it('blocks the 6th wrong /unlock attempt per (IP, slug) within 60s', async () => {
+    // Owner creates a pad with a password
+    const ownerRes = await server.inject({
+      method: 'POST',
+      url: '/api/auth/guest',
+      payload: { name: 'owner', email: 'owner-unlock@example.com' },
+      headers: { 'x-forwarded-for': '198.51.100.1' },
+    });
+    expect(ownerRes.statusCode).toBe(201);
+    const ownerToken = ownerRes.json().token as string;
+
+    const padRes = await server.inject({
+      method: 'POST',
+      url: '/api/pads',
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { language: 'python' },
+    });
+    const slug = padRes.json().pad.slug as string;
+
+    const setPwd = await server.inject({
+      method: 'PATCH',
+      url: `/api/pads/${slug}/password`,
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { password: 'correct-horse-battery-staple', role: 'collaborator' },
+    });
+    expect(setPwd.statusCode).toBe(200);
+
+    // Attacker (different user) tries to brute-force
+    const attackerRes = await server.inject({
+      method: 'POST',
+      url: '/api/auth/guest',
+      payload: { name: 'mallory', email: 'mallory-unlock@example.com' },
+      headers: { 'x-forwarded-for': '198.51.100.99' },
+    });
+    const attackerToken = attackerRes.json().token as string;
+    const attackerIp = '198.51.100.99';
+
+    let blocked = 0;
+    let wrong = 0;
+    for (let i = 0; i < 8; i++) {
+      const r = await server.inject({
+        method: 'POST',
+        url: `/api/pads/${slug}/unlock`,
+        headers: {
+          authorization: `Bearer ${attackerToken}`,
+          'x-forwarded-for': attackerIp,
+        },
+        payload: { password: `wrong-${i}` },
+      });
+      if (r.statusCode === 401) wrong++;
+      else if (r.statusCode === 429) blocked++;
+    }
+    expect(wrong).toBe(5);
+    expect(blocked).toBeGreaterThanOrEqual(3);
+  });
+
+  it('different slug has independent counter', async () => {
+    // Two pads with passwords, attempt across both — should not cross-block
+    const ownerRes = await server.inject({
+      method: 'POST',
+      url: '/api/auth/guest',
+      payload: { name: 'owner2', email: 'owner2-unlock@example.com' },
+      headers: { 'x-forwarded-for': '198.51.100.10' },
+    });
+    const ownerToken = ownerRes.json().token as string;
+
+    async function makePadWithPwd(): Promise<string> {
+      const p = await server.inject({
+        method: 'POST',
+        url: '/api/pads',
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { language: 'python' },
+      });
+      const slug = p.json().pad.slug as string;
+      await server.inject({
+        method: 'PATCH',
+        url: `/api/pads/${slug}/password`,
+        headers: { authorization: `Bearer ${ownerToken}` },
+        payload: { password: 'pad-secret', role: 'collaborator' },
+      });
+      return slug;
+    }
+
+    const slugA = await makePadWithPwd();
+    const slugB = await makePadWithPwd();
+
+    const attackerRes = await server.inject({
+      method: 'POST',
+      url: '/api/auth/guest',
+      payload: { name: 'mallory2', email: 'mallory2-unlock@example.com' },
+      headers: { 'x-forwarded-for': '198.51.100.20' },
+    });
+    const attackerToken = attackerRes.json().token as string;
+    const attackerIp = '198.51.100.20';
+
+    // 5 wrong attempts on slugA → exhaust quota
+    for (let i = 0; i < 5; i++) {
+      await server.inject({
+        method: 'POST',
+        url: `/api/pads/${slugA}/unlock`,
+        headers: {
+          authorization: `Bearer ${attackerToken}`,
+          'x-forwarded-for': attackerIp,
+        },
+        payload: { password: `wrong-a-${i}` },
+      });
+    }
+
+    // 6th on slugA → 429
+    const blockedA = await server.inject({
+      method: 'POST',
+      url: `/api/pads/${slugA}/unlock`,
+      headers: {
+        authorization: `Bearer ${attackerToken}`,
+        'x-forwarded-for': attackerIp,
+      },
+      payload: { password: 'still-wrong' },
+    });
+    expect(blockedA.statusCode).toBe(429);
+
+    // 1st on slugB → 401 (wrong, but quota intact)
+    const okB = await server.inject({
+      method: 'POST',
+      url: `/api/pads/${slugB}/unlock`,
+      headers: {
+        authorization: `Bearer ${attackerToken}`,
+        'x-forwarded-for': attackerIp,
+      },
+      payload: { password: 'wrong-b' },
+    });
+    expect(okB.statusCode).toBe(401);
+  });
+});

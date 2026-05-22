@@ -225,28 +225,43 @@ export async function registerPadRoutes(server: FastifyInstance): Promise<void> 
     return { ok: true, hasPassword: !!data.passwordHash };
   });
 
-  // Unlock pad with password - joins the calling user as the pad's passwordRole
-  server.post('/:slug/unlock', { preHandler: server.requireAuth }, async (req, reply) => {
-    const { slug } = req.params as { slug: string };
-    const userId = req.currentUser!.sub;
-    const parsed = z.object({ password: z.string().min(1).max(200) }).safeParse(req.body ?? {});
-    if (!parsed.success) {
-      return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
-    }
-    const pad = await prisma.pad.findUnique({ where: { slug } });
-    if (!pad) return reply.code(404).send({ error: 'not_found' });
-    if (!pad.passwordHash) return reply.code(400).send({ error: 'no_password' });
-    const ok = await verifyPassword(parsed.data.password, pad.passwordHash);
-    if (!ok) return reply.code(401).send({ error: 'wrong_password' });
-    if (pad.ownerId !== userId) {
-      await prisma.padMember.upsert({
-        where: { padId_userId: { padId: pad.id, userId } },
-        update: {},
-        create: { padId: pad.id, userId, role: pad.passwordRole },
-      });
-    }
-    return { ok: true, slug, role: pad.passwordRole };
-  });
+  // Unlock pad with password - joins the calling user as the pad's passwordRole.
+  // Brute-force throttle: 5 wrong attempts per (IP, slug) in 60s → 429. Bcrypt
+  // alone only buys time; a real throttle keeps weak passwords out of reach.
+  server.post(
+    '/:slug/unlock',
+    {
+      preHandler: server.requireAuth,
+      config: {
+        rateLimit: {
+          max: 5,
+          timeWindow: '1 minute',
+          keyGenerator: (req) => `${req.ip}:${(req.params as { slug?: string }).slug ?? ''}`,
+        },
+      },
+    },
+    async (req, reply) => {
+      const { slug } = req.params as { slug: string };
+      const userId = req.currentUser!.sub;
+      const parsed = z.object({ password: z.string().min(1).max(200) }).safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'invalid_input', details: parsed.error.flatten() });
+      }
+      const pad = await prisma.pad.findUnique({ where: { slug } });
+      if (!pad) return reply.code(404).send({ error: 'not_found' });
+      if (!pad.passwordHash) return reply.code(400).send({ error: 'no_password' });
+      const ok = await verifyPassword(parsed.data.password, pad.passwordHash);
+      if (!ok) return reply.code(401).send({ error: 'wrong_password' });
+      if (pad.ownerId !== userId) {
+        await prisma.padMember.upsert({
+          where: { padId_userId: { padId: pad.id, userId } },
+          update: {},
+          create: { padId: pad.id, userId, role: pad.passwordRole },
+        });
+      }
+      return { ok: true, slug, role: pad.passwordRole };
+    },
+  );
 
   // Fork pad - copy all files into a new pad owned by the caller.
   server.post('/:slug/fork', { preHandler: server.requireAuth }, async (req, reply) => {
