@@ -5,6 +5,16 @@ import { z } from 'zod';
 // signing key.
 export const DEV_JWT_SECRET = 'dev-secret-change-me-please-32chars';
 
+// z.coerce.boolean uses Boolean(x), so "false"/"0" both become true. Use an
+// explicit allow-list so EXEC_FORCE_LOCAL=false actually means false.
+export const strictBool = z
+  .union([z.boolean(), z.string(), z.undefined()])
+  .transform((v) => {
+    if (typeof v === 'boolean') return v;
+    if (v === undefined) return false;
+    return /^(1|true|yes|on)$/i.test(v.trim());
+  });
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().default('0.0.0.0'),
@@ -18,11 +28,11 @@ const schema = z.object({
   EXEC_MAX_TIMEOUT_MS: z.coerce.number().default(15000),
   EXEC_MEMORY_MB: z.coerce.number().default(256),
   EXEC_CPU: z.string().default('1'),
-  EXEC_FORCE_LOCAL: z.coerce.boolean().default(false),
+  EXEC_FORCE_LOCAL: strictBool.default(false),
   // Pre-pull docker images for all configured languages on API boot. Eliminates
   // the slow first-run image pull. Set false in CI / local dev where images are
   // already cached or where pulls would be wasted.
-  EXEC_PREPULL: z.coerce.boolean().default(true),
+  EXEC_PREPULL: strictBool.default(true),
   // Number of warm docker containers kept ready per language in EXEC_POOL_LANGS.
   // 0 disables the pool entirely (forces cold `docker run --rm` per /run, prior
   // behavior). Each warm slot consumes EXEC_MEMORY_MB of RAM while idle.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEV_JWT_SECRET, validateEnv, type Env } from '../src/env.js';
+import { DEV_JWT_SECRET, strictBool, validateEnv, type Env } from '../src/env.js';
 
 function makeEnv(overrides: Partial<Env> = {}): Env {
   return {
@@ -97,5 +97,33 @@ describe('validateEnv (development)', () => {
     );
     expect(errors).toEqual([]);
     expect(warnings).toEqual([]);
+  });
+});
+
+describe('strictBool', () => {
+  it('treats "false"/"0"/""/"no"/"off" as false (regression: z.coerce.boolean returned true)', () => {
+    for (const v of ['false', '0', '', 'no', 'off', 'FALSE', 'No']) {
+      expect(strictBool.parse(v)).toBe(false);
+    }
+  });
+
+  it('treats "1"/"true"/"yes"/"on" (case-insensitive) as true', () => {
+    for (const v of ['1', 'true', 'yes', 'on', 'TRUE', 'Yes', 'ON']) {
+      expect(strictBool.parse(v)).toBe(true);
+    }
+  });
+
+  it('passes booleans through unchanged', () => {
+    expect(strictBool.parse(true)).toBe(true);
+    expect(strictBool.parse(false)).toBe(false);
+  });
+
+  it('defaults undefined to false', () => {
+    expect(strictBool.parse(undefined)).toBe(false);
+  });
+
+  it('treats unrecognized strings as false (safer default than z.coerce)', () => {
+    expect(strictBool.parse('maybe')).toBe(false);
+    expect(strictBool.parse('garbage')).toBe(false);
   });
 });

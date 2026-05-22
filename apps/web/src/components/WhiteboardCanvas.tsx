@@ -30,7 +30,23 @@ type Stroke =
   | { id: string; kind: 'text'; color: string; x: number; y: number; text: string }
   | { id: string; kind: 'note'; color: string; x: number; y: number; w: number; h: number; text: string };
 
-const COLORS = ['#f4f4f5', '#34d399', '#60a5fa', '#fbbf24', '#f87171', '#a78bfa', '#fb7185'];
+const COLORS = [
+  '#ffffff', // white
+  '#d4d4d8', // light gray
+  '#9ca3af', // gray
+  '#000000', // black
+  '#ef4444', // red
+  '#f97316', // orange
+  '#fbbf24', // amber
+  '#22c55e', // green
+  '#14b8a6', // teal
+  '#06b6d4', // cyan
+  '#3b82f6', // blue
+  '#6366f1', // indigo
+  '#a855f7', // purple
+  '#ec4899', // pink
+];
+const DEFAULT_COLOR = '#9ca3af';
 
 const TOOLS: Array<{ id: Tool; label: string; hint: string; key: string; icon: React.ReactNode; cursor: string }> = [
   { id: 'select', label: 'Select', hint: 'Click to select, drag to move', key: 'V', icon: <SelectIcon />, cursor: 'default' },
@@ -64,7 +80,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
   });
 
   const [tool, setTool] = useState<Tool>('pen');
-  const [color, setColor] = useState(COLORS[0]);
+  const [color, setColor] = useState(DEFAULT_COLOR);
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [draft, setDraft] = useState<Stroke | null>(null);
@@ -541,7 +557,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
           ))}
         </div>
         <div className="mx-2 h-5 w-px bg-line" />
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1 max-w-[260px]">
           {COLORS.map((c) => (
             <button
               key={c}
@@ -551,6 +567,7 @@ export function WhiteboardCanvas({ client, active, slug }: Props) {
               } transition-transform`}
               style={{ backgroundColor: c }}
               aria-label={`color ${c}`}
+              title={c}
             />
           ))}
         </div>
