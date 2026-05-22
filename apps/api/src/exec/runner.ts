@@ -50,6 +50,22 @@ export async function runCode(req: RunRequest): Promise<RunResult> {
       return { ...r, runner: 'docker', language: lang.id };
     }
     if (lang.local) {
+      // Production must not silently execute untrusted user code on the host
+      // when Docker disappears. Operators that genuinely want host execution
+      // (e.g. trusted-LAN deployments) set EXEC_FORCE_LOCAL=true explicitly.
+      if (shouldRefuseHostFallback()) {
+        return {
+          stdout: '',
+          stderr:
+            'docker unavailable in production: refusing host fallback for safety. ' +
+            'Set EXEC_FORCE_LOCAL=true to override (untrusted users only on trusted LAN).',
+          exitCode: 127,
+          timedOut: false,
+          durationMs: 0,
+          runner: 'disabled',
+          language: lang.id,
+        };
+      }
       const args = lang.local.runCmd(filename);
       const [cmd, ...rest] = args;
       const r = await runProcessIn(sandbox.dir, cmd, rest, req.stdin, timeoutMs);
@@ -67,6 +83,16 @@ export async function runCode(req: RunRequest): Promise<RunResult> {
   } finally {
     await sandbox.cleanup();
   }
+}
+
+// Reads process.env at call time so tests can flip NODE_ENV / EXEC_FORCE_LOCAL
+// without re-importing the env module. EXEC_FORCE_LOCAL parsed via the same
+// allow-list as env.ts:strictBool (1|true|yes|on, case-insensitive).
+export function shouldRefuseHostFallback(): boolean {
+  if (process.env.NODE_ENV !== 'production') return false;
+  const raw = process.env.EXEC_FORCE_LOCAL?.trim() ?? '';
+  const forceLocal = /^(1|true|yes|on)$/i.test(raw);
+  return !forceLocal;
 }
 
 function clampTimeout(ms: number | undefined): number {

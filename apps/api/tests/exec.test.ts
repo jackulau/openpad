@@ -74,6 +74,32 @@ describe('exec: runCode (unit, local fallback)', () => {
     expect(res.runner).toBe('disabled');
     expect(res.exitCode).toBe(127);
   });
+
+  it('shouldRefuseHostFallback returns true in production without EXEC_FORCE_LOCAL', async () => {
+    const { shouldRefuseHostFallback } = await import('../src/exec/runner.js');
+    const origEnv = process.env.NODE_ENV;
+    const origForce = process.env.EXEC_FORCE_LOCAL;
+    try {
+      process.env.NODE_ENV = 'production';
+      delete process.env.EXEC_FORCE_LOCAL;
+      expect(shouldRefuseHostFallback()).toBe(true);
+      process.env.EXEC_FORCE_LOCAL = 'false';
+      expect(shouldRefuseHostFallback()).toBe(true);
+      process.env.EXEC_FORCE_LOCAL = '0';
+      expect(shouldRefuseHostFallback()).toBe(true);
+      process.env.EXEC_FORCE_LOCAL = 'true';
+      expect(shouldRefuseHostFallback()).toBe(false);
+      process.env.EXEC_FORCE_LOCAL = '1';
+      expect(shouldRefuseHostFallback()).toBe(false);
+      process.env.NODE_ENV = 'development';
+      delete process.env.EXEC_FORCE_LOCAL;
+      expect(shouldRefuseHostFallback()).toBe(false);
+    } finally {
+      process.env.NODE_ENV = origEnv;
+      if (origForce === undefined) delete process.env.EXEC_FORCE_LOCAL;
+      else process.env.EXEC_FORCE_LOCAL = origForce;
+    }
+  });
 });
 
 describe('exec: HTTP route', () => {
