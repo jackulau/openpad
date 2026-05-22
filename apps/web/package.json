@@ -10,7 +10,7 @@
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
+    "lint": "node --max-old-space-size=4096 ./node_modules/eslint/bin/eslint.js \"src/**/*.{ts,tsx}\" --max-warnings 0",
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {

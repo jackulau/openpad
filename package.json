@@ -16,7 +16,7 @@
     "start": "pnpm --filter @opencoder/api start",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "test:e2e": "pnpm --filter @opencoder/web test:e2e",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm -r --workspace-concurrency=1 lint",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
     "smoke": "bash scripts/smoke.sh",
