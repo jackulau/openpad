@@ -68,6 +68,49 @@ describe('audit log', () => {
     expect(rows[0].meta).toContain('audit-d@example.com');
   });
 
+  it('redacts secret-like keys in meta (regression: caller passes password by mistake)', async () => {
+    const { redactMeta, serializeMeta } = await import('../src/lib/audit.js');
+    const out = redactMeta({
+      role: 'editor',
+      password: 'p@ssw0rd',
+      apiKey: 'sk-xxx',
+      api_key: 'sk-yyy',
+      authorization: 'Bearer eyJ...',
+      jwt: 'eyJabc.def',
+      nested: { token: 'abc', name: 'fine' },
+      tokenCount: 1, // VALUE is a number; we redact even so — safer false-positive
+      empty: '',     // empty values stay empty (no leak)
+    });
+    expect(out).toMatchObject({
+      role: 'editor',
+      password: '[REDACTED]',
+      apiKey: '[REDACTED]',
+      api_key: '[REDACTED]',
+      authorization: '[REDACTED]',
+      jwt: '[REDACTED]',
+      nested: { token: '[REDACTED]', name: 'fine' },
+      tokenCount: '[REDACTED]',
+      empty: '',
+    });
+    const json = serializeMeta({ password: 'leaked' })!;
+    expect(json).toContain('[REDACTED]');
+    expect(json).not.toContain('leaked');
+  });
+
+  it('caps meta serialization at 4096 chars with truncation marker', async () => {
+    const { serializeMeta } = await import('../src/lib/audit.js');
+    const big = { note: 'x'.repeat(8000) };
+    const json = serializeMeta(big)!;
+    expect(json.length).toBeLessThanOrEqual(4096);
+    expect(json.endsWith('…[truncated]')).toBe(true);
+  });
+
+  it('passes short metas through unchanged', async () => {
+    const { serializeMeta } = await import('../src/lib/audit.js');
+    expect(serializeMeta({ role: 'editor' })).toBe('{"role":"editor"}');
+    expect(serializeMeta(undefined)).toBe(null);
+  });
+
   it('records pad password set + clear separately', async () => {
     const { token } = await guest('audit-e@example.com');
     const p = await server.inject({

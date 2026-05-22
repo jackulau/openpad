@@ -24,6 +24,36 @@ interface AuditInput {
   req?: FastifyRequest;
 }
 
+// Keys whose VALUES we wipe before persisting. The audit log goes to a
+// long-lived SQLite row that operators may grep for debugging; a stray
+// password or token in here is a credential leak.
+const SECRET_KEY_RE = /password|token|secret|jwt|api[_-]?key|authorization|cookie/i;
+const META_MAX = 4096;
+
+export function redactMeta(meta: unknown): unknown {
+  if (Array.isArray(meta)) return meta.map(redactMeta);
+  if (meta && typeof meta === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(meta as Record<string, unknown>)) {
+      if (SECRET_KEY_RE.test(k) && v !== null && v !== undefined && v !== '') {
+        out[k] = '[REDACTED]';
+      } else {
+        out[k] = redactMeta(v);
+      }
+    }
+    return out;
+  }
+  return meta;
+}
+
+export function serializeMeta(meta: Record<string, unknown> | undefined): string | null {
+  if (!meta) return null;
+  const safe = redactMeta(meta);
+  const json = JSON.stringify(safe);
+  if (json.length <= META_MAX) return json;
+  return json.slice(0, META_MAX - 14) + '…[truncated]';
+}
+
 // Best-effort: never block the request on logging failures. SQLite write errors
 // or constraint violations get swallowed and printed to stderr.
 export function recordAudit(input: AuditInput): void {
@@ -34,13 +64,13 @@ export function recordAudit(input: AuditInput): void {
         action: input.action,
         userId: input.userId ?? null,
         target: input.target ?? null,
-        meta: input.meta ? JSON.stringify(input.meta) : null,
+        meta: serializeMeta(input.meta),
         ip: req?.ip ?? null,
         userAgent: (req?.headers['user-agent'] as string | undefined) ?? null,
       },
     })
     .catch((err) => {
-       
+
       console.error('audit log write failed', { action: input.action, err: String(err) });
     });
 }
