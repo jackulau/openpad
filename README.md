@@ -13,7 +13,36 @@ and your friends, on your own port.
 > billing, no AI hiring funnel. Just a programmable workspace you control.
 
 <p align="center">
-  <img src="docs/screenshots/collab-cursors.png" alt="Two collaborators editing the same file with live cursors." width="900" />
+  <img src="docs/screenshots/whiteboard-system-design.png" alt="opencoder whiteboard — a system-design diagram of a URL shortener drawn with the built-in shapes, arrows, and sticky notes." width="900" />
+  <br />
+  <em>Sketch a system design, ship the code, hand the URL to a friend - all in one tab.</em>
+</p>
+
+<table align="center" width="100%">
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/editor.png" alt="Multi-file Monaco editor with live Yjs CRDT collaboration." width="100%" />
+      <br /><sub><b>Editor</b> · Monaco + Yjs · multi-file, multi-language, live cursors</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/members.png" alt="People panel with invite link, role picker, and live presence." width="100%" />
+      <br /><sub><b>Members</b> · invite by link · role picker · live presence</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/dashboard.png" alt="Dashboard with new-pad form: title, language, version, template, sandbox vs interview kind." width="100%" />
+      <br /><sub><b>Dashboard</b> · spin up a sandbox or interview room in one click</sub>
+    </td>
+    <td width="50%" align="center">
+      <img src="docs/screenshots/landing.png" alt="Landing page: pick a name, no email or password." width="100%" />
+      <br /><sub><b>Landing</b> · name-only signup · no email, no password</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/collab-cursors.png" alt="Two collaborators editing the same file with live cursors." width="780" />
   <br />
   <em>Two collaborators editing the same file with live cursors.</em>
 </p>
