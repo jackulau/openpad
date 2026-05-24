@@ -102,7 +102,12 @@
     background-color: rgb(var(--oc-accent-hover));
   }
   .btn-primary:disabled {
-    opacity: 0.55;
+    /* Solid muted surface with full-opacity muted text so the label stays
+     * legible. Earlier `opacity: 0.55` faded both bg AND text against an
+     * already-dim accent, making "Start coding →" nearly invisible on
+     * Landing in dark mode. */
+    background-color: rgb(var(--oc-bg-elevated));
+    color: rgb(var(--oc-text-muted));
     cursor: not-allowed;
   }
   .btn-secondary {

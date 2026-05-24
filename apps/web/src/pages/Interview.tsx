@@ -182,7 +182,9 @@ export function Interview() {
                   }
                   className="flex-1"
                 />
-                <span className="w-6 text-right tabular-nums">{score[key]}</span>
+                <span className="w-10 text-right tabular-nums text-sm text-secondary">
+                  {score[key]}<span className="text-subtle"> / 5</span>
+                </span>
               </div>
             ))}
 

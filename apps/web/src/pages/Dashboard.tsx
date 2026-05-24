@@ -179,7 +179,9 @@ export function Dashboard() {
                   <div className="text-xs text-subtle flex items-center gap-2">
                     <span className="font-mono">{p.language}</span>
                     <span>·</span>
-                    <span>{new Date(p.updatedAt).toLocaleString()}</span>
+                    <span title={new Date(p.updatedAt).toLocaleString()}>
+                      {timeAgo(p.updatedAt)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="chip chip-accent">{p.myRole}</span>
@@ -207,6 +209,25 @@ export function Dashboard() {
       </main>
     </>
   );
+}
+
+// Compact relative-time label for pad cards. Long absolute timestamps are
+// noise in a 1-line meta row; relative time reads at a glance and the full
+// timestamp stays available on hover via the parent `title` attribute.
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0 || Number.isNaN(ms)) return 'just now';
+  const s = Math.floor(ms / 1000);
+  if (s < 45) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(mo / 12)}y ago`;
 }
 
 function Field({
