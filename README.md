@@ -64,7 +64,7 @@ below maps the features that matter for technical interviews + pair coding.
 | Terminal (PTY) inside pad | Yes xterm + node-pty | Yes | No | No | Yes |
 | Sandboxed exec (Docker) | Yes + warm pool | Yes | No | Partial remote | Yes |
 | Streaming exec output | Yes WebSocket | Yes | No | No | Yes |
-| Warm-container pool perf | Yes <150ms hot lang | Yes | No | No | Yes |
+| Warm-container pool perf | Yes ~100ms hot, ~500ms cold | Yes | No | No | Yes |
 | Compile-artifact cache | Yes LRU 512MB | No | No | No | Partial |
 | Code playback / replay | Yes scrubber | Yes | No | No | No |
 | Whiteboard canvas | Yes infinite + select + multi + notes + export | Partial basic | No | No | No |
@@ -75,8 +75,8 @@ below maps the features that matter for technical interviews + pair coding.
 | One-port deploy | Yes one Docker image | n/a | n/a | n/a | n/a |
 
 <sub>Comparison reflects public docs + free-tier offerings as of May 2026.
-opencoder claims are backed by its test suite (42 api / 4 web test
-files, 292 assertions - run `pnpm test`). Closed competitors may have changed since - open
+opencoder claims are backed by its test suite (44 api / 5 web test
+files, 308 tests - run `pnpm test`). Closed competitors may have changed since - open
 a PR if a row is stale.</sub>
 
 ## Features

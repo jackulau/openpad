@@ -4,9 +4,13 @@ opencoder is a self-hosted, friends-and-team collaborative coding environment.
 This document describes the **threat model**, what the project does to mitigate
 each class of risk, and the operator's responsibilities.
 
-If you believe you've found a vulnerability, email **security@opencoder.local**
-(or whatever address the operator publishes for their instance). Please do not
-file public GitHub issues for security reports.
+If you believe you've found a vulnerability in the opencoder codebase, please
+open a private **GitHub Security Advisory** at
+`https://github.com/<owner>/<repo>/security/advisories/new` on the repository
+you cloned from. If you're reporting an issue against a *running instance*
+that someone else operates, use the contact the operator publishes — this
+project ships no central mailbox, since every deployment is independent.
+Please do not file public GitHub issues for security reports.
 
 ## Threat Model
 
