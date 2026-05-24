@@ -45,7 +45,13 @@ export function useCollab(slug: string | undefined): {
     const u1 = c.onStatus(setStatus);
     const u2 = c.onPresence((next) => {
       setPresence(next);
-      const nextIds = new Set(Object.keys(next));
+      // Toast on unique-user transitions, not per-tab. Multiple tabs from the
+      // same account should only toast on the first join and the last leave.
+      const nextByUser = new Map<string, PresenceUser>();
+      for (const p of Object.values(next)) {
+        if (!nextByUser.has(p.userId)) nextByUser.set(p.userId, p);
+      }
+      const nextIds = new Set(nextByUser.keys());
       if (seenIds.current === null) {
         seenIds.current = nextIds;
         presenceRef.current = next;
@@ -54,12 +60,16 @@ export function useCollab(slug: string | undefined): {
       const prev = seenIds.current;
       for (const id of nextIds) {
         if (!prev.has(id) && id !== myId) {
-          pushToast(`${next[id].name} joined`, 'info');
+          pushToast(`${nextByUser.get(id)?.name ?? 'Someone'} joined`, 'info');
         }
+      }
+      const prevByUser = new Map<string, PresenceUser>();
+      for (const p of Object.values(presenceRef.current)) {
+        if (!prevByUser.has(p.userId)) prevByUser.set(p.userId, p);
       }
       for (const id of prev) {
         if (!nextIds.has(id) && id !== myId) {
-          const leaver = presenceRef.current[id] ?? next[id];
+          const leaver = prevByUser.get(id);
           pushToast(`${leaver?.name ?? 'Someone'} left`, 'info');
         }
       }

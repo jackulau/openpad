@@ -1,4 +1,5 @@
 import { WebSocket } from 'ws';
+import { nanoid } from 'nanoid';
 import {
   MSG,
   decodeBinaryWithFile,
@@ -27,10 +28,18 @@ function countConns(padId: string): number {
 }
 
 const PRESENCE_BY_CONN = new WeakMap<WebSocket, Record<string, unknown>>();
-// padId → userId → latest awareness payload. Replayed to late joiners on HELLO
-// so they see existing cursors immediately (Google-Docs style) rather than
-// waiting for the next keystroke from each peer.
+// padId → presenceKey → latest awareness payload. Replayed to late joiners on
+// HELLO so they see existing cursors immediately (Google-Docs style) rather
+// than waiting for the next keystroke from each peer.
+//
+// presenceKey = `${userId}:${connId}`. The composite key lets one user open
+// multiple tabs from the same account without each new tab evicting the
+// previous one's presence entry.
 const PRESENCE_BY_PAD = new Map<string, Map<string, { fileId: string; payload: Buffer }>>();
+
+function presenceKey(userId: string, connId: string): string {
+  return `${userId}:${connId}`;
+}
 
 const COLORS = [
   '#f97316',
@@ -60,6 +69,7 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
   // that arrive while we resolve pad access asynchronously.
   const pending: Buffer[] = [];
   let access: Awaited<ReturnType<typeof getPadAccess>> = null;
+  const connId = nanoid(10);
   const conn: PadConn = {
     ws,
     userId: user.sub,
@@ -117,11 +127,14 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
           ws.send(encodeBinaryWithFile(MSG.STATE, hello.fileId, getStateAsUpdate(state.doc)));
         }
         // Replay cached awareness for this pad so the joiner sees existing
-        // cursors immediately. Skip the joiner's own entry.
+        // cursors immediately. Skip only this connection's own prior entry —
+        // other tabs from the same user are legitimate peers and must be
+        // replayed.
         const cached = PRESENCE_BY_PAD.get(access.pad.id);
         if (cached) {
-          for (const [otherId, entry] of cached) {
-            if (otherId === user.sub) continue;
+          const ownKey = presenceKey(user.sub, connId);
+          for (const [otherKey, entry] of cached) {
+            if (otherKey === ownKey) continue;
             ws.send(encodeBinaryWithFile(MSG.AWARENESS, entry.fileId, entry.payload));
           }
         }
@@ -151,12 +164,14 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
         const { fileId, payload } = decodeBinaryWithFile(raw);
         // Stamp the server-authoritative identity into the payload so peers
         // can't spoof another user's name/color via crafted awareness frames.
+        // connId disambiguates multiple tabs from the same user account.
         let stamped: Buffer = payload;
         try {
           const parsed = JSON.parse(payload.toString('utf8')) as Record<string, unknown>;
           const authoritative = {
             ...parsed,
             userId: user.sub,
+            connId,
             name: user.name,
             color: conn.color,
             fileId,
@@ -168,7 +183,7 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
             padMap = new Map();
             PRESENCE_BY_PAD.set(access.pad.id, padMap);
           }
-          padMap.set(user.sub, { fileId, payload: stamped });
+          padMap.set(presenceKey(user.sub, connId), { fileId, payload: stamped });
         } catch {
           /* ignore - relay the raw payload so legacy clients still work */
         }
@@ -199,17 +214,18 @@ export async function handleCollabConn({ ws, slug, user }: HandleOptions): Promi
     removeConn(conn);
     const remaining = countConns(access.pad.id);
     void recording.onParticipantLeave(access.pad.id, remaining);
-    // Drop the user's cached awareness so a fresh join shows them only after
-    // they re-broadcast presence.
+    // Drop only this connection's cached awareness — other tabs of the same
+    // user remain. Their entries are keyed by their own connId.
     const padMap = PRESENCE_BY_PAD.get(access.pad.id);
     if (padMap) {
-      padMap.delete(user.sub);
+      padMap.delete(presenceKey(user.sub, connId));
       if (padMap.size === 0) PRESENCE_BY_PAD.delete(access.pad.id);
     }
     // Use binary frame so client decodeBinaryWithFile parses correctly. Empty
-    // fileId is fine; payload carries the leave marker as JSON.
+    // fileId is fine; payload carries the leave marker as JSON. connId is
+    // included so peers only forget the specific tab that left.
     const leavePayload = Buffer.from(
-      JSON.stringify({ type: 'leave', userId: user.sub }),
+      JSON.stringify({ type: 'leave', userId: user.sub, connId }),
     );
     broadcast(
       access.pad.id,

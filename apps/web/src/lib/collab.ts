@@ -47,6 +47,10 @@ function decodeJSON<T>(buf: Uint8Array): T {
 
 export interface PresenceUser {
   userId: string;
+  // Server-stamped per-connection id. Lets one user open multiple tabs without
+  // each tab's presence stomping the previous one. Optional for backwards
+  // compat with old server builds.
+  connId?: string;
   name: string;
   color: string;
   fileId?: string;
@@ -61,6 +65,14 @@ export interface PresenceUser {
   // canvas. Cleared when the pointer leaves the canvas. See WhiteboardCanvas
   // for the throttled broadcast.
   canvasCursor?: { x: number; y: number } | null;
+}
+
+// `presence` is keyed by `${userId}:${connId}` so multiple tabs from the same
+// account each get their own entry. Use `presenceUserId(entry)` if you need
+// "which user is this", or aggregate via Object.values when you want one
+// avatar per human.
+export function presenceMapKey(p: Pick<PresenceUser, 'userId' | 'connId'>): string {
+  return `${p.userId}:${p.connId ?? 'legacy'}`;
 }
 
 export interface ChatMessage {
@@ -213,9 +225,16 @@ export class CollabClient {
             type?: string;
           };
           if ((p as { type?: string }).type === 'leave' && p.userId) {
-            delete this.presence[p.userId];
+            if (p.connId) {
+              delete this.presence[presenceMapKey(p)];
+            } else {
+              // legacy server: no connId — drop every entry for that user
+              for (const key of Object.keys(this.presence)) {
+                if (this.presence[key].userId === p.userId) delete this.presence[key];
+              }
+            }
           } else if (p.userId) {
-            this.presence[p.userId] = p;
+            this.presence[presenceMapKey(p)] = p;
           }
           this.presenceListeners.forEach((l) => l({ ...this.presence }));
         } catch {

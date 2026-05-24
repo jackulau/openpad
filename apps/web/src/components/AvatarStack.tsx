@@ -11,11 +11,16 @@ interface Props {
 // user's name; the wrapper has its own tooltip with the full roster.
 export function AvatarStack({ me, presence, max = 3 }: Props) {
   const all: Array<{ id: string; name: string; color: string; you: boolean }> = [];
+  // Aggregate by userId so multi-tab presence shows one avatar per human.
+  const byUser = new Map<string, PresenceUser>();
+  for (const p of Object.values(presence)) {
+    if (!byUser.has(p.userId)) byUser.set(p.userId, p);
+  }
   if (me) {
-    const own = presence[me.id];
+    const own = byUser.get(me.id);
     all.push({ id: me.id, name: me.name, color: own?.color ?? '#34d399', you: true });
   }
-  for (const p of Object.values(presence)) {
+  for (const p of byUser.values()) {
     if (p.userId === me?.id) continue;
     all.push({ id: p.userId, name: p.name, color: p.color, you: false });
   }
