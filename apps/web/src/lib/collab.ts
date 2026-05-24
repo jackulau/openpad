@@ -74,18 +74,25 @@ export interface ChatMessage {
 
 export type CollabStatus = 'connecting' | 'connected' | 'reconnecting' | 'closed';
 
+const PING_INTERVAL_MS = 5000;
+const RTT_EMA_ALPHA = 0.3;
+
 export class CollabClient {
   private ws: WebSocket | null = null;
   private docs = new Map<string, Y.Doc>();
   private listeners = new Set<(s: CollabStatus) => void>();
   private chatListeners = new Set<(m: ChatMessage) => void>();
   private presenceListeners = new Set<(users: Record<string, PresenceUser>) => void>();
+  private rttListeners = new Set<(ms: number) => void>();
   private presence: Record<string, PresenceUser> = {};
   private currentSelfPresence: Partial<PresenceUser> = {};
   private status: CollabStatus = 'connecting';
   private reconnectAttempt = 0;
   private reconnectTimer: number | null = null;
   private pendingHello: string[] = [];
+  private pingTimer: number | null = null;
+  private lastPingSentAt: number | null = null;
+  private rttEma: number | null = null;
 
   constructor(
     private slug: string,
@@ -127,6 +134,36 @@ export class CollabClient {
     return () => this.presenceListeners.delete(cb);
   }
 
+  onRtt(cb: (ms: number) => void): () => void {
+    this.rttListeners.add(cb);
+    if (this.rttEma != null) cb(this.rttEma);
+    return () => this.rttListeners.delete(cb);
+  }
+
+  getRtt(): number | null {
+    return this.rttEma;
+  }
+
+  private sendPing(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.lastPingSentAt = performance.now();
+    this.ws.send(encodeJSON(MSG.PING, {}));
+  }
+
+  private startPingLoop(): void {
+    this.stopPingLoop();
+    this.sendPing();
+    this.pingTimer = window.setInterval(() => this.sendPing(), PING_INTERVAL_MS);
+  }
+
+  private stopPingLoop(): void {
+    if (this.pingTimer != null) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+    this.lastPingSentAt = null;
+  }
+
   private connect(): void {
     this.setStatus(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting');
     this.ws = new WebSocket(this.url(), this.subprotocols());
@@ -155,6 +192,7 @@ export class CollabClient {
           ),
         );
       }
+      this.startPingLoop();
     };
 
     this.ws.onmessage = (e: MessageEvent) => {
@@ -190,6 +228,15 @@ export class CollabClient {
         } catch {
           /* ignore */
         }
+      } else if (type === MSG.PONG) {
+        if (this.lastPingSentAt != null) {
+          const sample = performance.now() - this.lastPingSentAt;
+          this.lastPingSentAt = null;
+          this.rttEma =
+            this.rttEma == null ? sample : RTT_EMA_ALPHA * sample + (1 - RTT_EMA_ALPHA) * this.rttEma;
+          const value = this.rttEma;
+          this.rttListeners.forEach((l) => l(value));
+        }
       } else if (type === MSG.ERROR) {
         try {
           console.warn('[collab] error', decodeJSON<unknown>(raw));
@@ -200,6 +247,7 @@ export class CollabClient {
     };
 
     this.ws.onclose = () => {
+      this.stopPingLoop();
       this.setStatus('reconnecting');
       this.scheduleReconnect();
     };
@@ -259,6 +307,7 @@ export class CollabClient {
   }
 
   close(): void {
+    this.stopPingLoop();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
