@@ -55,8 +55,9 @@ export function buildDockerArgs(
     '--read-only',
     '--security-opt',
     'no-new-privileges',
-    '--security-opt',
-    'seccomp=runtime/default',
+    // Default seccomp profile is applied implicitly when no --security-opt seccomp=... is
+    // passed. Earlier code passed seccomp=runtime/default, which the Docker CLI treats as
+    // a filesystem path (not a magic string) and rejects with "no such file or directory".
     '--cap-drop',
     'ALL',
     '--user',

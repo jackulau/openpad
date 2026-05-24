@@ -60,8 +60,11 @@ describe('docker sandbox argv', () => {
     expect(pairs['--security-opt']).toContain('no-new-privileges');
   });
 
-  it('enforces seccomp runtime/default', () => {
-    expect(pairs['--security-opt']).toContain('seccomp=runtime/default');
+  it('does not disable the default seccomp profile', () => {
+    // Default seccomp profile is applied implicitly. The only way to weaken it is
+    // --security-opt seccomp=unconfined, which must never appear in the runner args.
+    const opts = pairs['--security-opt'] ?? [];
+    expect(opts.some((o) => o.startsWith('seccomp=unconfined'))).toBe(false);
   });
 
   it('caps PID and file descriptors', () => {

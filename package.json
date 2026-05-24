@@ -9,6 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "node scripts/fix-node-pty-perms.mjs",
     "db:setup": "pnpm --filter @opencoder/api exec prisma generate && pnpm --filter @opencoder/api exec prisma migrate deploy",
     "predev": "pnpm db:setup",
     "dev": "concurrently -k -n api,web -c blue,green \"pnpm --filter @opencoder/api dev\" \"pnpm --filter @opencoder/web dev\"",

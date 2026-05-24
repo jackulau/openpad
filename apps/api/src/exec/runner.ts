@@ -5,6 +5,7 @@ import { makeSandbox } from './sandbox.js';
 import { isDockerAvailable, runInDocker, runProcess, type ExecResult } from './docker.js';
 import { runProcessIn } from './local.js';
 import { getPool } from './pool.js';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 // Per-group canonical filename. The runner picks `main{ext}` for any unknown id;
@@ -102,8 +103,13 @@ function clampTimeout(ms: number | undefined): number {
   return Math.min(Math.max(ms, 250), max);
 }
 
-// Copy source into the pooled container's /work, then `docker exec` the
-// runtime. Output captured the same way as cold runs.
+// Inject source into the pooled container's /work via a stdin-fed `cat >`,
+// then `docker exec` the runtime. We can't use `docker cp` because pooled
+// containers run with --read-only rootfs, which the docker daemon refuses
+// even when the target path is on a writable tmpfs mount (moby#38181).
+//
+// The injection step is its own docker exec call so user-supplied stdin
+// (req.stdin) stays separate from the file contents.
 async function runInPooledContainer(
   containerId: string,
   hostDir: string,
@@ -112,22 +118,30 @@ async function runInPooledContainer(
   timeoutMs: number,
   cmd: readonly string[],
 ): Promise<ExecResult> {
-  const cpResult = await runProcess(
+  const source = await readFile(path.join(hostDir, filename), 'utf8');
+  const injectResult = await runProcess(
     'docker',
-    ['cp', path.join(hostDir, filename), `${containerId}:/work/${filename}`],
-    undefined,
+    ['exec', '-i', containerId, 'sh', '-c', `cat > /work/${shellQuote(filename)}`],
+    source,
     10_000,
   );
-  if (cpResult.exitCode !== 0) {
+  if (injectResult.exitCode !== 0) {
     return {
       stdout: '',
-      stderr: `docker cp failed: ${cpResult.stderr}`,
+      stderr: `source injection failed: ${injectResult.stderr}`,
       exitCode: 127,
       timedOut: false,
-      durationMs: cpResult.durationMs,
+      durationMs: injectResult.durationMs,
     };
   }
   return runProcess('docker', ['exec', '-i', containerId, ...cmd], stdin, timeoutMs);
+}
+
+// Single-quote a path for safe use inside `sh -c "..."`. Filenames come from
+// language overrides and a canonical extension table, never from user input,
+// so quoting is belt-and-suspenders — still, do it.
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 function badLanguage(id: string): RunResult {

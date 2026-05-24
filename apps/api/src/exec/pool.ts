@@ -240,8 +240,8 @@ export function buildPoolContainerArgs(lang: LanguageSpec): string[] {
     '--read-only',
     '--security-opt',
     'no-new-privileges',
-    '--security-opt',
-    'seccomp=runtime/default',
+    // Default seccomp profile is applied implicitly when no --security-opt seccomp=... is
+    // passed. See note in docker.ts buildDockerArgs.
     '--cap-drop',
     'ALL',
     '--user',
