@@ -38,7 +38,7 @@ export function Pad() {
     queryFn: () => padsApi.get(slug),
     enabled: !!slug,
   });
-  const { client, status, presence } = useCollab(slug);
+  const { client, status, presence, rtt } = useCollab(slug);
 
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [language, setLanguage] = useState('python');
@@ -250,7 +250,7 @@ export function Pad() {
       <div className="border-b border-line px-4 py-2 flex items-center gap-3 text-sm">
         <h2 className="font-medium">{pad.data.pad.title}</h2>
         <span className="text-xs text-subtle">{slug}</span>
-        <ConnectionDot status={status} />
+        <ConnectionChip status={status} rtt={rtt} />
         <AvatarStack me={user ? { id: user.id, name: user.name } : null} presence={presence} />
         <div className="ml-auto flex items-center gap-2">
           {isInterview && (
@@ -541,20 +541,34 @@ function UnlockOrError({ slug, onUnlocked }: { slug: string; onUnlocked: () => v
   );
 }
 
-function ConnectionDot({ status }: { status: string }) {
+function ConnectionChip({ status, rtt }: { status: string; rtt: number | null }) {
   const colors: Record<string, string> = {
     connecting: 'bg-amber-400',
     reconnecting: 'bg-amber-400',
     connected: 'bg-success',
     closed: 'bg-muted',
   };
+  const labels: Record<string, string> = {
+    connecting: 'connecting…',
+    reconnecting: 'reconnecting…',
+    connected: 'live',
+    closed: 'offline',
+  };
+  const label = labels[status] ?? status;
+  const rttSuffix = status === 'connected' && rtt != null ? ` · ${rtt}ms` : '';
+  const title =
+    status === 'connected' && rtt != null
+      ? `collab live · round-trip ${rtt}ms`
+      : `collab ${status}`;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs text-subtle`}
-      title={`collab ${status}`}
+      className="inline-flex items-center gap-1.5 text-xs text-subtle"
+      title={title}
+      aria-label={title}
     >
       <span className={`size-1.5 rounded-full ${colors[status] ?? 'bg-muted'}`} />
-      {status}
+      {label}
+      {rttSuffix && <span className="text-subtle/80">{rttSuffix}</span>}
     </span>
   );
 }

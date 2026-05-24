@@ -8,6 +8,7 @@ export function useCollab(slug: string | undefined): {
   client: CollabClient | null;
   status: CollabStatus;
   presence: Record<string, PresenceUser>;
+  rtt: number | null;
 } {
   const token = getToken();
   const myId = useAuth((s) => s.user?.id);
@@ -21,6 +22,7 @@ export function useCollab(slug: string | undefined): {
   const [client, setClient] = useState<CollabClient | null>(null);
   const [status, setStatus] = useState<CollabStatus>('connecting');
   const [presence, setPresence] = useState<Record<string, PresenceUser>>({});
+  const [rtt, setRtt] = useState<number | null>(null);
 
   // Toast on join/leave by diffing the presence map. We skip the very first
   // snapshot so users don't see "Alice joined" for everyone already in the pad
@@ -39,10 +41,12 @@ export function useCollab(slug: string | undefined): {
     setClient(c);
     setStatus('connecting');
     setPresence({});
+    setRtt(null);
     presenceRef.current = {};
     seenIds.current = null;
 
     const u1 = c.onStatus(setStatus);
+    const u3 = c.onRtt((ms) => setRtt(Math.round(ms)));
     const u2 = c.onPresence((next) => {
       setPresence(next);
       // Toast on unique-user transitions, not per-tab. Multiple tabs from the
@@ -79,11 +83,12 @@ export function useCollab(slug: string | undefined): {
     return () => {
       u1();
       u2();
+      u3();
       c.close();
       seenIds.current = null;
     };
     // myId/pushToast come from stable zustand selectors; intentionally omitted.
   }, [slug, token]);
 
-  return { client, status, presence };
+  return { client, status, presence, rtt };
 }
