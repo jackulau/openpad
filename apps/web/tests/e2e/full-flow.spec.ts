@@ -1,35 +1,36 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 
-function uniqEmail(label: string): string {
-  return `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@opencoder.test`;
+function uniqName(label: string): string {
+  return `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+// Auth is guest-only — pick a name, get a token. No /register, no password.
 async function registerAndLogin(
   context: BrowserContext,
   name: string,
-  email: string,
+  _emailIgnored?: string,
 ): Promise<void> {
   const page = await context.newPage();
-  await page.goto('/register');
-  await page.getByLabel('Display name').fill(name);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill('password1234');
-  await page.getByRole('button', { name: /create account/i }).click();
+  await page.goto('/');
+  await page.getByLabel('Your name').fill(name);
+  await page.getByRole('button', { name: /Start coding/i }).click();
   await page.waitForURL(/\/dashboard$/);
   await page.close();
 }
 
+// Back-compat alias for tests that still use the old name/email signature.
+function uniqEmail(label: string): string {
+  return uniqName(label);
+}
+
 test.describe.configure({ mode: 'serial' });
 
-test('register → login → dashboard', async ({ browser }) => {
+test('guest signup → dashboard', async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  const email = uniqEmail('reg');
-  await page.goto('/register');
-  await page.getByLabel('Display name').fill('Reg');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill('password1234');
-  await page.getByRole('button', { name: /create account/i }).click();
+  await page.goto('/');
+  await page.getByLabel('Your name').fill(uniqName('signup'));
+  await page.getByRole('button', { name: /Start coding/i }).click();
   await page.waitForURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: /your pads/i })).toBeVisible();
   await ctx.close();

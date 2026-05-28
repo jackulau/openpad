@@ -1,20 +1,23 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 
+function uniqName(label: string): string {
+  return `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+// Back-compat shim — auth is guest-only, no email required.
 function uniqEmail(label: string): string {
-  return `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@opencoder.test`;
+  return uniqName(label);
 }
 
 async function registerAndLogin(
   context: BrowserContext,
   name: string,
-  email: string,
+  _emailIgnored?: string,
 ): Promise<void> {
   const page = await context.newPage();
-  await page.goto('/register');
-  await page.getByLabel('Display name').fill(name);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill('password1234');
-  await page.getByRole('button', { name: /create account/i }).click();
+  await page.goto('/');
+  await page.getByLabel('Your name').fill(name);
+  await page.getByRole('button', { name: /Start coding/i }).click();
   await page.waitForURL(/\/dashboard$/);
   await page.close();
 }
