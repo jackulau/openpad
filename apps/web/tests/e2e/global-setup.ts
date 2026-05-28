@@ -6,7 +6,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 export default async function globalSetup(): Promise<void> {
   const repoRoot = path.resolve(here, '..', '..', '..', '..');
-  const dbUrl = process.env.DATABASE_URL ?? 'file:./e2e.db';
+  // Absolute DATABASE_URL so prisma CLI (resolves relative to schema.prisma
+  // dir = apps/api/prisma) and PrismaClient runtime (resolves relative to
+  // process.cwd = apps/api when pnpm filter runs) point at the SAME file.
+  // A relative `file:./e2e.db` creates the DB at apps/api/prisma/e2e.db
+  // during migrate but the server tries to open apps/api/e2e.db — every
+  // signup 500s with "Unable to open the database file" (sqlite error 14).
+  const dbPath = path.join(repoRoot, 'apps', 'api', 'prisma', 'e2e.db');
+  const dbUrl = process.env.DATABASE_URL ?? `file:${dbPath}`;
   const jwtSecret =
     process.env.JWT_SECRET ?? 'e2e-secret-must-be-32-characters-long-enough';
   // Propagate for child processes (and the api dev server Playwright will launch).

@@ -103,15 +103,36 @@ test('two users in the same pad: keystrokes from A appear in B within 500ms', as
     { timeout: 15_000 },
   );
 
-  // Focus A's Monaco editor and type a distinctive marker so we can search for
-  // it in B's editor without false positives from the starter template.
-  const marker = `RT_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-  await pageA.locator('.monaco-editor').first().click();
-  // Move to end of file so we don't overwrite the starter template
-  await pageA.keyboard.press('Meta+End');
-  await pageA.keyboard.press('Enter');
+  // Insert a distinctive marker via Monaco's API directly. Clicking
+  // `.monaco-editor` and using `keyboard.type` is fragile: if the inner
+  // textarea isn't focused, keystrokes bubble to `window` where Pad.tsx's
+  // global keymap maps single-letter / digit keys (e.g. `5` → switch to
+  // whiteboard sidebar). That mis-routes the marker AND hides Monaco mid-test.
+  // Drive Monaco directly so focus state is irrelevant.
+  //
+  // Marker is letters-only (no digits) for belt-and-suspenders robustness if
+  // anyone re-introduces a window-level shortcut on digits.
+  const marker = `RT${Math.random().toString(36).replace(/[^a-z]/gi, '').slice(0, 8).toUpperCase()}`;
   const startedAt = Date.now();
-  await pageA.keyboard.type(marker, { delay: 10 });
+  await pageA.evaluate((marker) => {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const w = window as any;
+    const editors = w.monaco?.editor?.getEditors?.() ?? [];
+    const ed = editors[0];
+    if (!ed) throw new Error('Monaco editor not mounted on A');
+    ed.focus();
+    const model = ed.getModel();
+    const last = model.getLineCount();
+    const col = model.getLineMaxColumn(last);
+    // Append on a fresh line so we don't overwrite the starter template.
+    ed.executeEdits('e2e-marker', [
+      {
+        range: { startLineNumber: last, startColumn: col, endLineNumber: last, endColumn: col },
+        text: '\n' + marker,
+        forceMoveMarkers: true,
+      },
+    ]);
+  }, marker);
 
   // B should see the marker in its Monaco model within 5 seconds. Poll the
   // model value directly — Monaco's view-line span splitting can hide

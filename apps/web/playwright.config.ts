@@ -31,7 +31,13 @@ export default defineConfig({
           timeout: 60_000,
           cwd: '../..',
           env: {
-            DATABASE_URL: process.env.DATABASE_URL ?? 'file:./e2e.db',
+            // global-setup.ts computes an absolute DATABASE_URL and writes it
+            // into process.env BEFORE webServer launches. Fall back to a
+            // repo-rooted absolute path so PrismaClient (CWD-relative) and the
+            // prisma CLI (schema.prisma-dir-relative) open the SAME file.
+            DATABASE_URL:
+              process.env.DATABASE_URL ??
+              `file:${path.join(__dirname_, '..', '..', 'apps', 'api', 'prisma', 'e2e.db')}`,
             JWT_SECRET:
               process.env.JWT_SECRET ?? 'e2e-secret-must-be-32-characters-long-enough',
             EXEC_FORCE_LOCAL: 'true',
