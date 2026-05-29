@@ -34,6 +34,14 @@ step() { printf "→ %s\n" "$1"; }
 ok() { printf " [OK] %s\n" "$1"; }
 fail() { printf " [FAIL] %s\n" "$1" >&2; exit 1; }
 
+# Fail fast if something already listens on PORT. Otherwise the api we start
+# loses the bind race (EADDRINUSE), the health check below passes against the
+# stale squatter, and every request 500s against its dead DB handle — a very
+# confusing failure to debug (looks like a guest-auth bug, isn't).
+if command -v lsof > /dev/null 2>&1 && lsof -nP -iTCP:"$PORT" -sTCP:LISTEN > /dev/null 2>&1; then
+  fail "port $PORT already in use — kill the stale server first (lsof -ti tcp:$PORT | xargs kill)"
+fi
+
 step "applying migrations to $DB_PATH"
 (
   cd "$API_DIR"
