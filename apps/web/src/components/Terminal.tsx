@@ -42,84 +42,113 @@ export function Terminal({ slug, active }: Props) {
     if (!active || !containerRef.current) return;
     if (xtermRef.current) return;
 
-    const term = new XTerm({
-      fontFamily:
-        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-      fontSize: 13,
-      theme: theme === 'light' ? TERM_LIGHT : TERM_DARK,
-      cursorBlink: true,
-      convertEol: true,
-    });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(containerRef.current);
-    fit.fit();
-    xtermRef.current = term;
-    fitRef.current = fit;
-    term.writeln('connecting…');
+    const container = containerRef.current;
+    let disposed = false;
+    let term: XTerm | null = null;
+    let ws: WebSocket | null = null;
+    let ro: ResizeObserver | null = null;
+    let onResize: (() => void) | null = null;
+    let onData: { dispose(): void } | null = null;
 
-    const token = getToken();
-    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(
-      `${proto}://${window.location.host}/ws/terminal/${slug}`,
-      token ? [`oc.bearer.${token}`] : undefined,
-    );
-    wsRef.current = ws;
-
-    ws.onmessage = (e) => {
-      let msg: { type: string; data?: string; error?: string; message?: string };
-      try {
-        msg = JSON.parse(e.data as string);
-      } catch {
-        return;
-      }
-      if (msg.type === 'ready') {
-        term.clear();
-      } else if (msg.type === 'output' && typeof msg.data === 'string') {
-        term.write(msg.data);
-      } else if (msg.type === 'error') {
-        term.writeln(`\r\n\x1b[31m[error] ${msg.error}${msg.message ? `: ${msg.message}` : ''}\x1b[0m`);
-      } else if (msg.type === 'idle_timeout') {
-        term.writeln('\r\n\x1b[33m[disconnected: idle timeout]\x1b[0m');
-      } else if (msg.type === 'exit') {
-        term.writeln('\r\n[session ended]');
-      }
-    };
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-    };
-    ws.onclose = () => term.writeln('\r\n[disconnected]');
-
-    const onData = term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'input', data }));
-      }
-    });
-    const onResize = (): void => {
+    // fit() reads the renderer's computed dimensions; it throws
+    // ("Cannot read properties of undefined (reading 'dimensions')") if the
+    // terminal hasn't laid out yet or has already been disposed. Guard + swallow.
+    const safeFit = (fit: FitAddon): void => {
       try {
         fit.fit();
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-        }
       } catch {
-        /* ignore */
+        /* renderer not ready or terminal disposed */
       }
     };
-    window.addEventListener('resize', onResize);
-    const ro = new ResizeObserver(onResize);
-    ro.observe(containerRef.current);
+
+    // Defer init by one frame. React StrictMode (and rapid panel toggling)
+    // mounts the effect, cleans up, and remounts synchronously. Opening xterm
+    // and then disposing it in the same tick leaves a pending internal render
+    // frame that crashes reading `_renderService.dimensions`. Scheduling the
+    // open on rAF and cancelling it on cleanup means the throwaway mount never
+    // opens a terminal — we open exactly once, on the mount that survives.
+    const raf = requestAnimationFrame(() => {
+      if (disposed) return;
+
+      const t = new XTerm({
+        fontFamily:
+          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+        fontSize: 13,
+        theme: theme === 'light' ? TERM_LIGHT : TERM_DARK,
+        cursorBlink: true,
+        convertEol: true,
+      });
+      term = t;
+      const fit = new FitAddon();
+      t.loadAddon(fit);
+      t.open(container);
+      safeFit(fit);
+      xtermRef.current = t;
+      fitRef.current = fit;
+      t.writeln('connecting…');
+
+      const token = getToken();
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const socket = new WebSocket(
+        `${proto}://${window.location.host}/ws/terminal/${slug}`,
+        token ? [`oc.bearer.${token}`] : undefined,
+      );
+      ws = socket;
+      wsRef.current = socket;
+
+      socket.onmessage = (e) => {
+        let msg: { type: string; data?: string; error?: string; message?: string };
+        try {
+          msg = JSON.parse(e.data as string);
+        } catch {
+          return;
+        }
+        if (msg.type === 'ready') {
+          t.clear();
+        } else if (msg.type === 'output' && typeof msg.data === 'string') {
+          t.write(msg.data);
+        } else if (msg.type === 'error') {
+          t.writeln(`\r\n\x1b[31m[error] ${msg.error}${msg.message ? `: ${msg.message}` : ''}\x1b[0m`);
+        } else if (msg.type === 'idle_timeout') {
+          t.writeln('\r\n\x1b[33m[disconnected: idle timeout]\x1b[0m');
+        } else if (msg.type === 'exit') {
+          t.writeln('\r\n[session ended]');
+        }
+      };
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ type: 'resize', cols: t.cols, rows: t.rows }));
+      };
+      socket.onclose = () => t.writeln('\r\n[disconnected]');
+
+      onData = t.onData((data) => {
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'input', data }));
+        }
+      });
+      onResize = (): void => {
+        safeFit(fit);
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'resize', cols: t.cols, rows: t.rows }));
+        }
+      };
+      window.addEventListener('resize', onResize);
+      ro = new ResizeObserver(onResize);
+      ro.observe(container);
+    });
 
     return () => {
-      onData.dispose();
-      ro.disconnect();
-      window.removeEventListener('resize', onResize);
+      disposed = true;
+      cancelAnimationFrame(raf);
+      onData?.dispose();
+      ro?.disconnect();
+      if (onResize) window.removeEventListener('resize', onResize);
       try {
-        ws.close();
+        ws?.close();
       } catch {
         /* ignore */
       }
       try {
-        term.dispose();
+        term?.dispose();
       } catch {
         /* ignore */
       }
