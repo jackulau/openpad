@@ -25,7 +25,12 @@ export default defineConfig({
     ? undefined
     : [
         {
-          command: 'pnpm --filter @opencoder/api dev',
+          // Non-watch (`tsx`, not `tsx watch`) so Playwright tears the api down as
+          // one clean process tree. `tsx watch` spawns a child node the watcher
+          // doesn't forward SIGTERM to, orphaning a process that keeps holding
+          // :4000 — the next back-to-back run then reuses that half-dead server
+          // (reuseExistingServer) and races/times out. e2e never needs hot-reload.
+          command: 'pnpm --filter @opencoder/api exec tsx src/index.ts',
           url: `${apiURL}/health`,
           reuseExistingServer: !process.env.CI,
           timeout: 60_000,
@@ -42,6 +47,10 @@ export default defineConfig({
               process.env.JWT_SECRET ?? 'e2e-secret-must-be-32-characters-long-enough',
             EXEC_FORCE_LOCAL: 'true',
             NODE_ENV: 'development',
+            // e2e makes many guest signups from one IP per run; without this the
+            // guest-signup limiter (10/min/IP) trips into 429s and reddens the
+            // suite on warm/consecutive runs. Honored only outside production.
+            RATE_LIMIT_DISABLED: 'true',
             PUBLIC_BASE_URL: 'http://localhost:5173',
           },
         },

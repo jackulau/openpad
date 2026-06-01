@@ -49,6 +49,11 @@ const schema = z.object({
   EXEC_PER_PAD_CONCURRENCY: z.coerce.number().int().min(1).default(5),
   TERMINAL_IDLE_MS: z.coerce.number().default(10 * 60_000),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(120),
+  // Disable all rate limiting (global + per-route, incl. guest-signup). Intended
+  // for automated e2e where a single IP makes many signups/run and would trip the
+  // limiter into 429s, producing flaky failures. Ignored in production (see
+  // buildServer) so a stray env can't strip rate limits from a live deployment.
+  RATE_LIMIT_DISABLED: strictBool.default(false),
   ALLOWED_ORIGINS: z.string().optional(),
 });
 
@@ -91,6 +96,12 @@ export function validateEnv(e: Env): EnvValidationResult {
       warnings.push(
         'ALLOWED_ORIGINS is unset in production: CORS will reflect any request Origin. ' +
           'Set ALLOWED_ORIGINS to a comma-separated allow-list before exposing publicly.',
+      );
+    }
+    if (e.RATE_LIMIT_DISABLED) {
+      warnings.push(
+        'RATE_LIMIT_DISABLED=true is ignored in production: rate limiting stays ON. ' +
+          'This flag is only for automated e2e/test runs.',
       );
     }
   } else if (isWeakSecret) {

@@ -126,8 +126,14 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
     cookie: { cookieName: 'oc_token', signed: false },
   });
   // Always register rate-limit so per-route overrides on auth endpoints take effect.
-  // In tests we bypass via allowList so unrelated tests don't trip into 429s.
-  const rateLimitDisabled = isTest && opts.enableRateLimitInTests !== true;
+  // In tests we bypass via allowList so unrelated tests don't trip into 429s. e2e
+  // runs in development mode (NODE_ENV=development) but still needs the bypass —
+  // a single IP does many guest signups per run — so RATE_LIMIT_DISABLED opts in
+  // without flipping NODE_ENV (which would also silence the logger + skip plugins).
+  // Never honored in production: a stray env must not strip a live deployment's limits.
+  const rateLimitDisabled =
+    (isTest && opts.enableRateLimitInTests !== true) ||
+    (env.RATE_LIMIT_DISABLED && env.NODE_ENV !== 'production');
   await server.register(rateLimit, {
     global: !rateLimitDisabled,
     max: env.RATE_LIMIT_PER_MINUTE,
