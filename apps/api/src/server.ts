@@ -6,6 +6,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import staticPlugin from '@fastify/static';
 import websocket from '@fastify/websocket';
@@ -28,22 +29,34 @@ import { registerRecordingsRoutes } from './routes/recordings.js';
 import { registerWhiteboardRoutes } from './routes/whiteboard.js';
 import { registerQuestionRoutes } from './routes/questions.js';
 import { registerInterviewRoutes } from './routes/interviews.js';
+import { registerNotesRoutes } from './routes/notes.js';
+import { registerAssetRoutes } from './routes/assets.js';
 import { registerSetupRoutes } from './routes/setup.js';
 import { reconcileOnBoot } from './services/recordings.js';
 import { registerWebSocket } from './ws/index.js';
 
 export type AppServer = FastifyInstance;
 
-// CSP is tuned so Monaco (WebWorkers via blob:) and xterm (WASM + blob workers)
-// still load. HSTS is preload-friendly but only emitted when behind HTTPS - the
-// dev server is HTTP and operators terminating TLS at a reverse proxy can flip it
-// on with ENABLE_HSTS=1.
+// SHA-256 of the inline theme-bootstrap script in apps/web/index.html. That
+// script runs synchronously before React mounts to apply the saved light/dark
+// theme and avoid a flash-of-wrong-theme; under our no-unsafe-inline CSP it must
+// be allow-listed by content hash. Regenerate if the inline script ever changes:
+//   node -e 'const c=require("crypto"),f=require("fs");const h=f.readFileSync("apps/web/dist/index.html","utf8").match(/<script>([\s\S]*?)<\/script>/)[1];console.log("sha256-"+c.createHash("sha256").update(h).digest("base64"))'
+const INDEX_INLINE_SCRIPT_HASH =
+  "'sha256-HHFjouLOqRxV7dk23cVQNfPy4c5zE6qAywjao03pTI4='";
+
+// CSP is tuned so Monaco (bundled + WebWorkers via blob:) and xterm (WASM + blob
+// workers) still load. Scripts are self-hosted — no CDN — so script-src stays
+// 'self' + blob: (worker bootstrap) plus the single hashed theme script above.
+// HSTS is preload-friendly but only emitted when behind HTTPS - the dev server is
+// HTTP and operators terminating TLS at a reverse proxy can flip it on with
+// ENABLE_HSTS=1.
 function buildHelmetOptions(): Parameters<typeof helmet>[1] {
   return {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", 'blob:'],
+        scriptSrc: ["'self'", 'blob:', INDEX_INLINE_SCRIPT_HASH],
         scriptSrcAttr: ["'none'"],
         workerSrc: ["'self'", 'blob:'],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -141,6 +154,11 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
     keyGenerator: (req) => req.ip,
     allowList: rateLimitDisabled ? () => true : undefined,
   });
+  // Problem-asset (image) uploads for interview Notes. 5MB/file cap sits under
+  // the 8MB global body limit; one file per request.
+  await server.register(multipart, {
+    limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 8 },
+  });
   await server.register(websocket, {
     options: {
       maxPayload: 4 * 1024 * 1024,
@@ -175,6 +193,8 @@ export async function buildServer(opts: BuildServerOptions = {}): Promise<AppSer
   await server.register(registerWhiteboardRoutes, { prefix: '/api/pads' });
   await server.register(registerQuestionRoutes, { prefix: '/api/questions' });
   await server.register(registerInterviewRoutes, { prefix: '/api/pads' });
+  await server.register(registerNotesRoutes, { prefix: '/api/pads' });
+  await server.register(registerAssetRoutes, { prefix: '/api/assets' });
   await server.register(registerSetupRoutes, { prefix: '/api/setup' });
   await registerWebSocket(server);
 

@@ -1,3 +1,7 @@
+// Side-effect import: self-hosts Monaco (loader.config + workers) before the
+// <Monaco> component below can trigger the loader's CDN fetch. Kept in this module
+// — imported only by the lazy editor routes — so Monaco stays out of the entry chunk.
+import '../lib/monaco-setup';
 import { useEffect, useRef } from 'react';
 import Monaco, { type Monaco as MonacoNs, type OnMount } from '@monaco-editor/react';
 import type * as MonacoEditorTypes from 'monaco-editor';

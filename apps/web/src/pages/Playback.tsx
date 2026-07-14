@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import * as Y from 'yjs';
@@ -55,6 +55,15 @@ export function Playback() {
   const events = tl.data?.events ?? [];
   const max = events.length;
 
+  // Refs let the play loop read the live scrub position + events without listing
+  // them as effect deps — depending on scrubIndex (which the loop itself sets)
+  // would tear down and recreate the timer every tick, ignoring the real delay
+  // and racing to the end in one frame.
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  const scrubRef = useRef(scrubIndex);
+  scrubRef.current = scrubIndex;
+
   useEffect(() => {
     if (tl.data && !activeFileId && tl.data.files[0]) {
       setActiveFileId(tl.data.files[0].id);
@@ -64,26 +73,28 @@ export function Playback() {
   useEffect(() => {
     if (!playing || max === 0) return;
     let cancelled = false;
-    let cur = scrubIndex;
+    let handle: ReturnType<typeof setTimeout>;
     const tick = (): void => {
       if (cancelled) return;
+      const cur = scrubRef.current;
       if (cur >= max) {
         setPlaying(false);
         return;
       }
-      cur += 1;
-      setScrubIndex(cur);
-      const next = events[cur];
-      const now = events[cur - 1];
-      const delay = next && now ? Math.max(20, (next.ts - now.ts) / speed) : 100;
-      setTimeout(tick, Math.min(delay, 1500));
+      const nextIndex = cur + 1;
+      scrubRef.current = nextIndex;
+      setScrubIndex(nextIndex);
+      const evNext = eventsRef.current[nextIndex];
+      const evNow = eventsRef.current[nextIndex - 1];
+      const delay = evNext && evNow ? Math.min(Math.max(20, (evNext.ts - evNow.ts) / speed), 1500) : 100;
+      handle = setTimeout(tick, delay);
     };
-    const handle = setTimeout(tick, 0);
+    handle = setTimeout(tick, 0);
     return () => {
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [playing, speed, max, events, scrubIndex]);
+  }, [playing, speed, max]);
 
   const { sourceText, runEvents, chatEvents, terminalEvents } = useMemo(() => {
     if (!tl.data || !activeFileId)

@@ -144,9 +144,28 @@ model Question {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   pads        Pad[]
+  assets      Asset[]
 
   @@index([createdBy])
   @@index([difficulty])
+}
+
+// Image (or other binary) attached to a problem's markdown description. Bytes
+// live inline (like yjsState / EditEvent.payload) so uploads are atomic with the
+// row and cascade-delete with the question. Referenced from markdown as
+// ![alt](/api/assets/<id>).
+model Asset {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  filename   String
+  mime       String
+  size       Int
+  data       Bytes
+  createdBy  String
+  createdAt  DateTime @default(now())
+
+  @@index([questionId])
 }
 
 model Recording {

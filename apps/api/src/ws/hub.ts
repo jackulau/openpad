@@ -96,20 +96,57 @@ export function getOrCreateRoom(padId: string): PadRoom {
   return r;
 }
 
+// Coalesces concurrent first-touch loads of the same file. Without this, two
+// clients opening a brand-new pad within the same DB round-trip window each seed
+// their own Y.Doc (different clientIDs); the second overwrites the first in the
+// cache, so the two clients get STATE from different docs and never converge.
+// Keyed `${padId}:${fileId}`, cleared when the load settles.
+const ensureInflight = new Map<string, Promise<FileState>>();
+
 export async function ensureFile(padId: string, fileId: string): Promise<FileState> {
   const room = getOrCreateRoom(padId);
-  let st = room.files.get(fileId);
-  if (st) return st;
+  const cached = room.files.get(fileId);
+  if (cached) return cached;
+  const key = `${padId}:${fileId}`;
+  let p = ensureInflight.get(key);
+  if (!p) {
+    p = loadFileState(room, fileId).finally(() => ensureInflight.delete(key));
+    ensureInflight.set(key, p);
+  }
+  return p;
+}
+
+async function loadFileState(room: PadRoom, fileId: string): Promise<FileState> {
+  // A concurrent caller may have populated the cache while we awaited the DB.
+  const existing = room.files.get(fileId);
+  if (existing) return existing;
   const file = await prisma.padFile.findUnique({ where: { id: fileId } });
   const doc = new Y.Doc();
+  let seededFromContent = false;
   if (file?.yjsState && file.yjsState.length > 0) {
     Y.applyUpdate(doc, new Uint8Array(file.yjsState));
   } else if (file?.content) {
     // Seed Y.Text with content
     doc.getText('content').insert(0, file.content);
+    seededFromContent = true;
   }
-  st = { doc, dirty: false, lastFlush: Date.now() };
+  const st: FileState = { doc, dirty: false, lastFlush: Date.now() };
   room.files.set(fileId, st);
+  // Persist the freshly-seeded state right away. Otherwise the doc lives only in
+  // memory (dirty=false ⇒ never flushed) and yjsState stays NULL; a server
+  // restart then re-seeds from file.content with a NEW clientID, duplicating the
+  // template on every client and stranding subsequent edits in pendingStructs.
+  // Writing it now pins a stable doc identity across restarts.
+  if (seededFromContent && file) {
+    try {
+      await prisma.padFile.update({
+        where: { id: fileId },
+        data: { yjsState: Buffer.from(Y.encodeStateAsUpdate(doc)) },
+      });
+    } catch {
+      /* best-effort; the next dirty flush will persist it */
+    }
+  }
   return st;
 }
 
@@ -209,4 +246,5 @@ export async function flushAllForTest(): Promise<void> {
 export function _resetForTest(): void {
   rooms.clear();
   emptySince.clear();
+  ensureInflight.clear();
 }

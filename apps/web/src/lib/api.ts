@@ -69,8 +69,27 @@ export const api = {
   get: <T>(url: string, opts?: { signal?: AbortSignal }) => request<T>('GET', url, undefined, opts),
   post: <T>(url: string, body?: unknown, opts?: { signal?: AbortSignal }) =>
     request<T>('POST', url, body, opts),
+  put: <T>(url: string, body?: unknown, opts?: { signal?: AbortSignal }) =>
+    request<T>('PUT', url, body, opts),
   patch: <T>(url: string, body?: unknown, opts?: { signal?: AbortSignal }) =>
     request<T>('PATCH', url, body, opts),
   delete: <T>(url: string, opts?: { signal?: AbortSignal; body?: unknown }) =>
     request<T>('DELETE', url, opts?.body, { signal: opts?.signal }),
 };
+
+// Multipart upload with the bearer token. Kept separate from request() because
+// FormData must set its own content-type (with boundary); we must not override it.
+export async function uploadFile<T>(url: string, file: File, field = 'file'): Promise<T> {
+  const form = new FormData();
+  form.append(field, file);
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers['authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { method: 'POST', headers, body: form, credentials: 'include' });
+  const text = await res.text();
+  const parsed = text ? safeJSON(text) : null;
+  if (!res.ok) {
+    throw new HttpError(res.status, (parsed?.error as string) ?? res.statusText, parsed?.details);
+  }
+  return parsed as T;
+}

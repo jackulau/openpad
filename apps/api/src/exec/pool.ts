@@ -250,6 +250,11 @@ export function buildPoolContainerArgs(lang: LanguageSpec): string[] {
     '/tmp:exec,rw,size=64m,uid=65534,gid=65534',
     '--tmpfs',
     '/work:exec,rw,size=64m,uid=65534,gid=65534',
+    // Toolchains write build caches under $HOME; rootfs is --read-only so point
+    // HOME at the writable /tmp tmpfs. go122 is a default pooled lang and dies
+    // without this ("mkdir /.cache: read-only file system"). See docker.ts.
+    '-e',
+    'HOME=/tmp',
     '--memory',
     `${env.EXEC_MEMORY_MB}m`,
     '--memory-swap',

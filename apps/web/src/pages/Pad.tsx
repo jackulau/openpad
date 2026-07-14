@@ -16,6 +16,7 @@ import { AvatarStack } from '../components/AvatarStack';
 import { RecordingsPanel } from '../components/RecordingsPanel';
 import { WhiteboardCanvas } from '../components/WhiteboardCanvas';
 import { MembersPanel } from '../components/MembersPanel';
+import { NotesPanel } from '../components/NotesPanel';
 import { PadSidebar, type SidebarTool } from '../components/PadSidebar';
 import { ShortcutsModal, useShortcutsModal } from '../components/ShortcutsModal';
 import { padsApi } from '../lib/pads';
@@ -60,6 +61,9 @@ export function Pad() {
         setActiveFileId(first.id);
         setLanguage(first.language);
       }
+      // Interview pads open on the problem (Notes), LeetCode-style, so the
+      // candidate sees the prompt immediately. Only on first load.
+      if (pad.data.pad.kind === 'interview') setSidebarTool('notes');
     }
   }, [pad.data, activeFileId]);
 
@@ -186,12 +190,13 @@ export function Pad() {
       const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
       if (inField || e.metaKey || e.ctrlKey || e.altKey) return;
       const sidebarShortcuts: Record<string, SidebarTool> = {
-        '1': 'files',
-        '2': 'members',
-        '3': 'chat',
-        '4': 'terminal',
-        '5': 'whiteboard',
-        '6': 'recordings',
+        '1': 'notes',
+        '2': 'files',
+        '3': 'members',
+        '4': 'chat',
+        '5': 'terminal',
+        '6': 'whiteboard',
+        '7': 'recordings',
       };
       const target = sidebarShortcuts[e.key];
       if (target) {
@@ -345,9 +350,10 @@ export function Pad() {
             style={
               sidebarTool === 'whiteboard'
                 ? undefined
-                : { width: sidebarTool === 'terminal' ? 480 : 320 }
+                : { width: sidebarTool === 'terminal' ? 480 : sidebarTool === 'notes' ? 420 : 320 }
             }
           >
+            {sidebarTool === 'notes' && <NotesPanel slug={slug} />}
             {sidebarTool === 'files' && (
               <div className="p-2 overflow-y-auto h-full">
                 <FileTree

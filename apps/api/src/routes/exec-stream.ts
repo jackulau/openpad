@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { StringDecoder } from 'node:string_decoder';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { WebSocket, RawData } from 'ws';
 import { z } from 'zod';
@@ -78,6 +79,7 @@ export async function registerExecStreamRoutes(server: FastifyInstance): Promise
       }
 
       let child: ChildProcess | null = null;
+      let reap: (() => void) | null = null;
       socket.on('close', () => {
         if (child) {
           try {
@@ -86,6 +88,9 @@ export async function registerExecStreamRoutes(server: FastifyInstance): Promise
             /* ignore */
           }
         }
+        // Killing the `docker run` client leaves the container running; reap it
+        // by name so a client that disconnects mid-run doesn't leak a container.
+        reap?.();
       });
 
       const process = (raw: RawData): void => {
@@ -94,8 +99,9 @@ export async function registerExecStreamRoutes(server: FastifyInstance): Promise
           socket,
           raw,
           defaultLang: access.pad.language,
-          onChild: (c) => {
+          onChild: (c, reapFn) => {
             child = c;
+            reap = reapFn ?? null;
           },
         });
       };
@@ -113,7 +119,7 @@ interface HandlePayloadArgs {
   socket: WebSocket;
   raw: RawData;
   defaultLang: string;
-  onChild: (c: ChildProcess) => void;
+  onChild: (c: ChildProcess, reap?: () => void) => void;
 }
 
 async function handlePayload({
@@ -150,8 +156,19 @@ async function handlePayload({
   try {
     const docker = await isDockerAvailable();
     let child: ChildProcess;
+    let reap: (() => void) | undefined;
     if (docker && lang.docker) {
-      child = spawn('docker', buildDockerArgs(lang, sandbox.dir, filename), {
+      // Name the container so a timeout / disconnect can reap it (SIGKILL of the
+      // docker CLI leaves the container running).
+      const containerName = `oc-exec-${randomUUID()}`;
+      reap = () => {
+        try {
+          spawn('docker', ['rm', '-f', containerName], { stdio: 'ignore' }).on('error', () => {});
+        } catch {
+          /* ignore */
+        }
+      };
+      child = spawn('docker', buildDockerArgs(lang, sandbox.dir, filename, { name: containerName }), {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } else if (lang.local) {
@@ -172,7 +189,7 @@ async function handlePayload({
       safeClose(socket);
       return;
     }
-    onChild(child);
+    onChild(child, reap);
 
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -182,16 +199,29 @@ async function handlePayload({
       } catch {
         /* ignore */
       }
+      reap?.();
     }, timeoutMs);
 
+    // Decoders hold back partial multibyte codepoints that straddle two chunks,
+    // so streamed text is never corrupted mid-character.
+    const outDec = new StringDecoder('utf8');
+    const errDec = new StringDecoder('utf8');
     child.stdout?.on('data', (chunk: Buffer) => {
-      safeSend(socket, { kind: 'stdout', chunk: chunk.toString('utf8') });
+      const s = outDec.write(chunk);
+      if (s) safeSend(socket, { kind: 'stdout', chunk: s });
     });
     child.stderr?.on('data', (chunk: Buffer) => {
-      safeSend(socket, { kind: 'stderr', chunk: chunk.toString('utf8') });
+      const s = errDec.write(chunk);
+      if (s) safeSend(socket, { kind: 'stderr', chunk: s });
     });
-    if (parsed.stdin !== undefined) child.stdin?.write(parsed.stdin);
-    child.stdin?.end();
+    // Unhandled stdin EPIPE would crash the whole API process.
+    child.stdin?.on('error', () => {});
+    try {
+      if (parsed.stdin !== undefined) child.stdin?.write(parsed.stdin);
+      child.stdin?.end();
+    } catch {
+      /* stdin already destroyed */
+    }
 
     const exitCode = await new Promise<number | null>((resolve) => {
       child.on('exit', (code) => {
@@ -203,6 +233,12 @@ async function handlePayload({
         resolve(127);
       });
     });
+
+    // Flush any bytes the decoders were holding for a straddling codepoint.
+    const outTail = outDec.end();
+    if (outTail) safeSend(socket, { kind: 'stdout', chunk: outTail });
+    const errTail = errDec.end();
+    if (errTail) safeSend(socket, { kind: 'stderr', chunk: errTail });
 
     safeSend(socket, {
       kind: 'end',

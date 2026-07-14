@@ -102,6 +102,9 @@ export class CollabClient {
   private reconnectAttempt = 0;
   private reconnectTimer: number | null = null;
   private pendingHello: string[] = [];
+  // Local edits made while the socket was down, keyed by fileId. Replayed on
+  // reconnect so a wifi blip mid-typing doesn't silently drop the user's work.
+  private pendingUpdates = new Map<string, Uint8Array[]>();
   private pingTimer: number | null = null;
   private lastPingSentAt: number | null = null;
   private rttEma: number | null = null;
@@ -204,6 +207,9 @@ export class CollabClient {
           ),
         );
       }
+      // Replay edits buffered while the socket was down. Sent after HELLO so the
+      // server has (re)loaded the doc before our updates land on it.
+      this.flushPendingUpdates();
       this.startPingLoop();
     };
 
@@ -275,6 +281,16 @@ export class CollabClient {
     };
   }
 
+  private flushPendingUpdates(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    for (const [fileId, updates] of this.pendingUpdates) {
+      if (updates.length === 0) continue;
+      const merged = updates.length === 1 ? updates[0] : Y.mergeUpdates(updates);
+      this.ws.send(encodeBinaryWithFile(MSG.UPDATE, fileId, merged));
+    }
+    this.pendingUpdates.clear();
+  }
+
   private scheduleReconnect(): void {
     if (this.reconnectTimer != null) return;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempt), 8000);
@@ -294,6 +310,13 @@ export class CollabClient {
       if (origin === 'remote') return;
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         this.ws.send(encodeBinaryWithFile(MSG.UPDATE, fileId, update));
+      } else {
+        // Socket is down (reconnecting). Buffer the edit instead of dropping it.
+        const list = this.pendingUpdates.get(fileId) ?? [];
+        list.push(update);
+        // Coalesce a long offline burst so memory + the eventual replay stay
+        // bounded; Yjs updates merge losslessly.
+        this.pendingUpdates.set(fileId, list.length > 256 ? [Y.mergeUpdates(list)] : list);
       }
     });
     // request initial state from server

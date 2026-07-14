@@ -69,7 +69,10 @@ const java = (v: string) => ({
   group: 'java',
   version: `JDK ${v}`,
   docker: {
-    image: `eclipse-temurin:${v}-jdk-alpine`,
+    // Debian-based (not -alpine): Temurin's alpine JDK tags publish amd64 only,
+    // so on arm64 hosts (Apple Silicon) they fail with "no matching manifest".
+    // The default tag carries both amd64 + arm64; javac/java are on PATH in both.
+    image: `eclipse-temurin:${v}-jdk`,
     runCmd: (f: string) => ['sh', '-c', `javac ${f} && java ${stripExt(f)}`],
   },
   local: { runCmd: (f: string) => ['sh', '-c', `javac ${f} && java ${stripExt(f)}`] },
@@ -312,7 +315,9 @@ export const LANGUAGES: Record<string, LanguageSpec> = {
     group: 'julia',
     version: '1.10',
     isDefault: true,
-    docker: { image: 'julia:1.10-alpine', runCmd: (f) => ['julia', f] },
+    // Debian-based (not -alpine): the julia alpine tag is amd64-only and fails on
+    // arm64; the default tag is multi-arch. `julia` is on PATH in both.
+    docker: { image: 'julia:1.10', runCmd: (f) => ['julia', f] },
     local: { runCmd: (f) => ['julia', f] },
   },
   zig: {
