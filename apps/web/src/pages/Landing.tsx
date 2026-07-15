@@ -1,11 +1,19 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/authStore';
 import { HttpError } from '../lib/api';
 import { Logo } from '../components/Logo';
 
+// Only follow a `next` that is an internal, single-slash path so a crafted
+// ?next=//evil.com or ?next=https://… can't turn signup into an open redirect.
+function safeNext(next: string | null): string {
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return '/dashboard';
+}
+
 export function Landing() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { guest, loading } = useAuth();
   const [name, setName] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -15,7 +23,9 @@ export function Landing() {
     setErr(null);
     try {
       await guest(name.trim());
-      navigate('/dashboard');
+      // Honor ?next so invite links (/invite/:token) and shared pad URLs
+      // (/p/:slug, via ProtectedRoute) land on the intended page, not /dashboard.
+      navigate(safeNext(searchParams.get('next')), { replace: true });
     } catch (e) {
       setErr(e instanceof HttpError ? e.error : 'Network error');
     }
