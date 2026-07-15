@@ -353,7 +353,7 @@ export function Pad() {
                 : { width: sidebarTool === 'terminal' ? 480 : sidebarTool === 'notes' ? 420 : 320 }
             }
           >
-            {sidebarTool === 'notes' && <NotesPanel slug={slug} />}
+            {sidebarTool === 'notes' && <NotesPanel slug={slug} client={client} />}
             {sidebarTool === 'files' && (
               <div className="p-2 overflow-y-auto h-full">
                 <FileTree

@@ -14,6 +14,7 @@
 //   6 = error (server → client: JSON {error, message})
 //   7 = ping (bi-directional: empty)
 //   8 = pong (bi-directional: empty)
+//   9 = notes (server → client: pad's Notes/problem changed → client refetches)
 
 export const MSG = {
   HELLO: 0,
@@ -25,6 +26,7 @@ export const MSG = {
   ERROR: 6,
   PING: 7,
   PONG: 8,
+  NOTES: 9,
 } as const;
 
 export type MsgType = (typeof MSG)[keyof typeof MSG];

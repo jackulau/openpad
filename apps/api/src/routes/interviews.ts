@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { canManage, canView, getPadAccess } from '../lib/permissions.js';
+import { broadcastNotesChanged } from '../ws/hub.js';
 
 const rubricBody = z.object({
   correctness: z.number().int().min(0).max(5).optional(),
@@ -139,6 +140,9 @@ export async function registerInterviewRoutes(server: FastifyInstance): Promise<
         where: { id: access.pad.id },
         data: { questionId },
       });
+      // Swapping the attached question changes the problem everyone sees, so
+      // push the same live-refresh signal the Notes panel uses.
+      broadcastNotesChanged(access.pad.id);
       return { ok: true };
     },
   );

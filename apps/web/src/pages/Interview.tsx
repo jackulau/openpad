@@ -45,6 +45,16 @@ export function Interview() {
     }
   }, [view.data]);
 
+  // Live-refresh the attached question when the interviewer changes it (or edits
+  // the problem from the Notes panel) so the candidate's view updates without a
+  // reload. The server pushes a NOTES frame over the pad socket on any change.
+  useEffect(() => {
+    if (!client) return;
+    return client.onNotes(() => {
+      qc.invalidateQueries({ queryKey: ['interview', slug] });
+    });
+  }, [client, qc, slug]);
+
   const save = useMutation({
     mutationFn: () => interviewApi.saveScore(slug, score),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['interview', slug] }),

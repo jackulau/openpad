@@ -3,6 +3,7 @@ import type { Pad } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { canManage, canView, getPadAccess } from '../lib/permissions.js';
+import { broadcastNotesChanged } from '../ws/hub.js';
 
 // Problem "Notes": a markdown description plus attached images that an
 // interviewer (pad owner) surfaces in the pad's expandable Notes panel. The
@@ -96,6 +97,7 @@ export async function registerNotesRoutes(server: FastifyInstance): Promise<void
         ...(parsed.data.title ? { title: parsed.data.title } : {}),
       },
     });
+    broadcastNotesChanged(access.pad.id);
     return { question: await serializeQuestion(question.id) };
   });
 
@@ -140,6 +142,7 @@ export async function registerNotesRoutes(server: FastifyInstance): Promise<void
       },
       select: { id: true, filename: true, mime: true, size: true },
     });
+    broadcastNotesChanged(access.pad.id);
     return reply.code(201).send({ asset: { ...asset, url: assetUrl(asset.id) } });
   });
 
@@ -158,6 +161,7 @@ export async function registerNotesRoutes(server: FastifyInstance): Promise<void
         return reply.code(404).send({ error: 'not_found' });
       }
       await prisma.asset.delete({ where: { id: assetId } });
+      broadcastNotesChanged(access.pad.id);
       return { ok: true };
     },
   );

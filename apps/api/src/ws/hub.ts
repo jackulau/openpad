@@ -1,6 +1,7 @@
 import { WebSocket } from 'ws';
 import * as Y from 'yjs';
 import { prisma } from '../db.js';
+import { encodeJSON, MSG } from './protocol.js';
 
 export interface PadConn {
   ws: WebSocket;
@@ -175,6 +176,14 @@ export function broadcast(
     if (conn.ws.readyState !== WebSocket.OPEN) continue;
     conn.ws.send(payload);
   }
+}
+
+// Push a "Notes/problem changed" signal to everyone currently in the pad so
+// their problem view refetches live (mirrors how editor updates propagate).
+// Safe to call from REST handlers: broadcast is a no-op when the room is empty,
+// so a save never depends on anyone being connected.
+export function broadcastNotesChanged(padId: string): void {
+  broadcast(padId, null, encodeJSON(MSG.NOTES, {}));
 }
 
 export function addConn(conn: PadConn): void {

@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notesApi } from '../lib/notes';
+import type { CollabClient } from '../lib/collab';
 import { MarkdownView } from './MarkdownView';
 import { useToasts } from '../lib/toast';
 import { HttpError } from '../lib/api';
@@ -16,10 +17,21 @@ const DIFFICULTY_CHIP: Record<string, string> = {
 // The pad's expandable "Notes" panel - a LeetCode-style problem description.
 // Any member reads the rendered markdown + images; the owner can edit the
 // description and upload images inline.
-export function NotesPanel({ slug }: { slug: string }) {
+export function NotesPanel({ slug, client }: { slug: string; client?: CollabClient | null }) {
   const qc = useQueryClient();
   const push = useToasts((s) => s.push);
   const notes = useQuery({ queryKey: ['notes', slug], queryFn: () => notesApi.get(slug) });
+
+  // Live sync: when a peer saves the problem or changes an image, the server
+  // pushes a NOTES frame over the pad socket. Refetch so readers see it without
+  // a manual reload. In-progress local edits live in separate state, so an
+  // invalidation here never clobbers what the owner is typing.
+  useEffect(() => {
+    if (!client) return;
+    return client.onNotes(() => {
+      qc.invalidateQueries({ queryKey: ['notes', slug] });
+    });
+  }, [client, qc, slug]);
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');

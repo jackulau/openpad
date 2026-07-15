@@ -10,6 +10,7 @@ export const MSG = {
   ERROR: 6,
   PING: 7,
   PONG: 8,
+  NOTES: 9,
 } as const;
 
 type MsgType = (typeof MSG)[keyof typeof MSG];
@@ -95,6 +96,7 @@ export class CollabClient {
   private listeners = new Set<(s: CollabStatus) => void>();
   private chatListeners = new Set<(m: ChatMessage) => void>();
   private presenceListeners = new Set<(users: Record<string, PresenceUser>) => void>();
+  private notesListeners = new Set<() => void>();
   private rttListeners = new Set<(ms: number) => void>();
   private presence: Record<string, PresenceUser> = {};
   private currentSelfPresence: Partial<PresenceUser> = {};
@@ -141,6 +143,14 @@ export class CollabClient {
   onChat(cb: (m: ChatMessage) => void): () => void {
     this.chatListeners.add(cb);
     return () => this.chatListeners.delete(cb);
+  }
+
+  // Fires when a peer changes the pad's Notes/problem (save, image upload, or
+  // delete). Carries no payload — the subscriber refetches the notes query so
+  // everyone in the pad sees the update live, like editor text and cursors.
+  onNotes(cb: () => void): () => void {
+    this.notesListeners.add(cb);
+    return () => this.notesListeners.delete(cb);
   }
 
   onPresence(cb: (users: Record<string, PresenceUser>) => void): () => void {
@@ -253,6 +263,8 @@ export class CollabClient {
         } catch {
           /* ignore */
         }
+      } else if (type === MSG.NOTES) {
+        this.notesListeners.forEach((l) => l());
       } else if (type === MSG.PONG) {
         if (this.lastPingSentAt != null) {
           const sample = performance.now() - this.lastPingSentAt;
